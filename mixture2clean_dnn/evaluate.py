@@ -10,6 +10,7 @@ import csv
 import numpy as np
 import cPickle
 import matplotlib.pyplot as plt
+import prepare_data as pp_data
 
 
 def plot_training_stat(args):
@@ -47,7 +48,10 @@ def plot_training_stat(args):
     plt.ylabel("Loss")
     plt.legend(handles=[line_tr, line_te])
     plt.xticks(np.arange(len(iters)), iters)
-    plt.show()
+    # plt.show()
+    out_path = os.path.join(workspace, "figures", "train_history.png")
+    pp_data.create_folder(os.path.dirname(out_path))
+    plt.savefig(out_path)
 
 
 def calculate_pesq(args):
