@@ -345,7 +345,7 @@ def pack_features(args):
 
 
 def get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat, n_noise_frame, n_hop, mel_basis):
-    n_pad = (n_concat - 1) / 2
+    n_pad = (n_concat - 1)
     n = mixed_complx_x.shape[0]
 
     noisy_lps =np.log((np.abs(mixed_complx_x))**2)
@@ -366,7 +366,7 @@ def get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat, n
     input1 = np.hstack([input1, np.tile(static_noise_lps, (n, 1))])
     input1 = np.hstack([input1, noisy_mfcc])
     input1 = np.hstack([input1, np.tile(static_noise_mfcc, (n, 1))])
-    input1 = pad_with_border(input1, n_pad)
+    input1 = pad_head_with_border(input1, n_pad)
     input1_3d = mat_2d_to_3d(input1, agg_num=n_concat, hop=n_hop)
 
     out1 = np.empty((n, 0))
@@ -376,14 +376,14 @@ def get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat, n
     out1 = np.hstack([out1, noise_mfcc])
     out1 = np.hstack([out1, irm])
     out1 = np.hstack([out1, irm_mel])
-    out1 = pad_with_border(out1, n_pad)
+    out1 = pad_head_with_border(out1, n_pad)
     out1_3d = mat_2d_to_3d(out1, agg_num=n_concat, hop=n_hop)
-    out1 = out1_3d[:, (n_concat - 1) / 2, :]
+    out1 = out1_3d[:, (n_concat - 1) , :]
 
     input2 = np.empty((n, 0))
     input2 = np.hstack([input2, noisy_lps])
     input2 = np.hstack([input2, noisy_mfcc])
-    input2 = pad_with_border(input2, n_pad)
+    input2 = pad_head_with_border(input2, n_pad)
     input2_3d = mat_2d_to_3d(input2, agg_num=n_concat, hop=n_hop)
     input2 = input2_3d[:, (n_concat - 1) / 2, :]
 
@@ -392,9 +392,9 @@ def get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat, n
     out2 = np.hstack([out2, clean_mfcc])
     out2 = np.hstack([out2, irm])
     out2 = np.hstack([out2, irm_mel])
-    out2 = pad_with_border(out2, n_pad)
+    out2 = pad_head_with_border(out2, n_pad)
     out2_3d = mat_2d_to_3d(out2, agg_num=n_concat, hop=n_hop)
-    out2 = out2_3d[:, (n_concat - 1) / 2, :]
+    out2 = out2_3d[:, (n_concat - 1) , :]
 
     return input1_3d, input2, out1, out2
 
@@ -427,6 +427,11 @@ def pad_with_border(x, n_pad):
     x_pad_list = [x[0:1]] * n_pad + [x] + [x[-1:]] * n_pad
     return np.concatenate(x_pad_list, axis=0)
 
+def pad_head_with_border(x, n_pad):
+    """Pad the begin and finish of spectrogram with border frame value.
+    """
+    x_pad_list = [x[0:1]] * n_pad + [x]
+    return np.concatenate(x_pad_list, axis=0)
 
 ###
 def compute_scaler(args):

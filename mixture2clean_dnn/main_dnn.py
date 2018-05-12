@@ -6,6 +6,7 @@ Modified: -
 """
 import numpy as np
 import os
+import sys
 import pickle
 import cPickle
 import h5py
@@ -126,8 +127,8 @@ def train(args):
     layer = Flatten(name='flatten')(input1)
     layer = Dense(n_hid, activation='relu', name='dense1')(layer)
     layer = Dropout(0.2)(layer)
-    # layer = Dense(n_hid, activation='relu', name='dense2')(layer)
-    # layer = Dropout(0.2)(layer)
+    layer = Dense(n_hid, activation='relu', name='dense2')(layer)
+    layer = Dropout(0.2)(layer)
     partial_out1 = Dense(out_dim1, name='1_out_linear')(layer)
     partial_out1_irm = Dense(out_dim1_irm, name='1_out_irm', activation='sigmoid')(layer)
     out1 = concatenate([partial_out1, partial_out1_irm], name='out1')
@@ -135,14 +136,15 @@ def train(args):
     layer = concatenate([input2, out1], name='merge')
     layer = Dense(n_hid, activation='relu', name='dense3')(layer)
     layer = Dropout(0.2)(layer)
-    # layer = Dense(n_hid, activation='relu', name='dense4')(layer)
-    # layer = Dropout(0.2)(layer)
+    layer = Dense(n_hid, activation='relu', name='dense4')(layer)
+    layer = Dropout(0.2)(layer)
     partial_out2 = Dense(out_dim2, name='2_out_linear')(layer)
     partial_out2_irm = Dense(out_dim2_irm, name='2_out_irm', activation='sigmoid')(layer)
     out2 = concatenate([partial_out2, partial_out2_irm], name='out2')
     model = Model(inputs=[input1, input2], outputs=[out1, out2])
 
     model.summary()
+    sys.stdout.flush()
     model.compile(loss='mean_absolute_error',
                   optimizer=Adam(lr=lr))
     # Data generator.
@@ -177,10 +179,11 @@ def train(args):
         iter += 1
 
         # Validate and save training stats. 
-        if iter % 10 == 0:
+        if iter % 100 == 0:
             tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2)
             te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2)
             print("Iteration: %d, tr_loss: %f, te_loss: %f" % (iter, tr_loss, te_loss))
+            sys.stdout.flush()
 
             # Save out training stats. 
             stat_dict = {'iter': iter,
@@ -190,7 +193,7 @@ def train(args):
             cPickle.dump(stat_dict, open(stat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
         # Save model. 
-        if iter % 50 == 0:
+        if iter % 5000 == 0:
             model_path = os.path.join(model_dir, "md_%diters.h5" % iter)
             model.save(model_path)
             print("Saved model to %s" % model_path)
