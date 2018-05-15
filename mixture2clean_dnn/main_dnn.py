@@ -107,12 +107,12 @@ def train(args):
     # Build model
     (_, n_concat, n_freq) = tr_x1.shape
     n_hid = 2048
-    input_dim1 = (257 + 40) * 2
-    input_dim2 = (257 + 40)
-    out_dim1 = (257 + 40) * 2
-    out_dim1_irm = 257 + 40
-    out_dim2 = (257 + 40)
-    out_dim2_irm = (257 + 40)
+    input_dim1 = (257 + 40 +30) * 2
+    input_dim2 = (257 + 40+30)
+    out_dim1 = (257 + 40+30) * 2
+    out_dim1_irm = 257 + 40 +64
+    out_dim2 = (257 + 40+30)
+    out_dim2_irm = (257 + 40+64)
 
     # model = Sequential()
     # model.add(Flatten(input_shape=(n_concat, n_freq)))
@@ -264,7 +264,7 @@ def inference(args):
                 pred[0][:, :257] +
                 pred[1][:, :257] +
                 np.log(np.abs(mixed_cmplx_x) + 1e-08) +
-                np.log(pred[1][:, 297:554])
+                np.log(pred[1][:, 327:584])
         )
 
         # Debug plot. 
