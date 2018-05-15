@@ -146,7 +146,7 @@ def train(args):
     model.summary()
     sys.stdout.flush()
     model.compile(loss='mean_absolute_error',
-                  optimizer=Adam(lr=lr))
+                  optimizer=Adam(lr=lr,epsilon=1e-03))
     # Data generator.
     tr_gen = DataGenerator(batch_size=batch_size, type='train')
     eval_te_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100)
@@ -193,7 +193,7 @@ def train(args):
             cPickle.dump(stat_dict, open(stat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
         # Save model. 
-        if iter % 5000 == 0:
+        if iter % (iteration/20) == 0:
             model_path = os.path.join(model_dir, "md_%diters.h5" % iter)
             model.save(model_path)
             print("Saved model to %s" % model_path)
