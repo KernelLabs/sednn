@@ -5,6 +5,7 @@ Created:  2017.12.22
 Modified: - 
 """
 import os
+import sys
 import soundfile
 import numpy as np
 import argparse
@@ -192,6 +193,7 @@ def calculate_mixture_features(args):
         # Print. 
         if cnt % 100 == 0:
             print(cnt)
+            sys.stdout.flush()
 
         cnt += 1
 
@@ -320,6 +322,7 @@ def pack_features(args):
         # Print.
         if cnt % 100 == 0:
             print(cnt)
+            sys.stdout.flush()
 
         # if cnt == 3: break
         cnt += 1
@@ -343,6 +346,7 @@ def pack_features(args):
 
     print("Write out to %s" % out_path)
     print("Pack features finished! %s s" % (time.time() - t1,))
+    sys.stdout.flush()
 
 
 def get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat, n_noise_frame, n_hop, mel_basis):
