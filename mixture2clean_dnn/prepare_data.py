@@ -141,6 +141,7 @@ def calculate_mixture_features(args):
 
     t1 = time.time()
     cnt = 0
+    total_frame = 0
     for i1 in xrange(1, len(lis)):
         [speech_na, noise_na, noise_onset, noise_offset] = lis[i1]
         noise_onset = int(noise_onset)
@@ -182,6 +183,7 @@ def calculate_mixture_features(args):
         mixed_complx_x = calc_sp(mixed_audio, mode='complex')
         speech_x = calc_sp(speech_audio, mode='magnitude')
         noise_x = calc_sp(noise_audio, mode='magnitude')
+        total_frame += mixed_complx_x.shape[0]
 
         # Write out features. 
         out_feat_path = os.path.join(workspace, "features", "spectrogram",
@@ -198,6 +200,9 @@ def calculate_mixture_features(args):
         cnt += 1
 
     print("Extracting feature time: %s" % (time.time() - t1))
+    total_frame_path = os.path.join(workspace, "total_frame", "%s.p"%data_type)
+    create_folder(os.path.dirname(total_frame_path))
+    cPickle.dump(total_frame, open(total_frame_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
 
 def rms(y):
@@ -301,12 +306,16 @@ def pack_features(args):
     out_dim2 = (257 + 40+30)
     out_dim2_irm = (257 + 40+64)
 
+    total_frame_path = os.path.join(workspace, "total_frame", "%s.p"%data_type)
+    total_frame = cPickle.load(open(total_frame_path, 'rb'))
+
     # x_all = []  # (n_segs, n_concat, n_freq)
-    x_all = np.empty((0,n_concat,input_dim1))
-    y_all = np.empty((0,out_dim1+out_dim1_irm))
+    x_all = np.zeros((total_frame,n_concat,input_dim1))
+    y_all = np.zeros((total_frame,out_dim1+out_dim1_irm))
     # y_all = []  # (n_segs, n_freq)
-    y2_all = np.empty((0,out_dim2+out_dim2_irm))
-    x2_all = np.empty((0,input_dim2))
+    y2_all = np.zeros((total_frame,out_dim2+out_dim2_irm))
+    x2_all = np.zeros((total_frame,input_dim2))
+
 
     cnt = 0
     t1 = time.time()
@@ -315,6 +324,7 @@ def pack_features(args):
     feat_dir = os.path.join(workspace, "features", "spectrogram", data_type, "%ddb" % int(snr))
     names = os.listdir(feat_dir)
     mel_basis = librosa.filters.mel(cfg.sample_rate, cfg.n_window, n_mels=40)
+    idx = 0
     for na in names:
         # Load feature. 
         feat_path = os.path.join(feat_dir, na)
@@ -322,10 +332,11 @@ def pack_features(args):
         [mixed_complx_x, speech_x, noise_x, alpha, na] = data
         input1_3d, input2, out1, out2 = get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat,
                                                                n_noise_frame, n_hop, mel_basis)
-        x_all = np.concatenate((x_all,input1_3d),axis=0)
-        x2_all = np.concatenate((x2_all,input2),axis=0)
-        y_all = np.concatenate((y_all,out1),axis=0)
-        y2_all = np.concatenate((y2_all,out2),axis=0)
+        cur_frame = idx+input1_3d.shape[0]
+        x_all[idx:cur_frame,:,:] = input1_3d
+        x2_all[idx:cur_frame,:] = input2
+        y_all[idx:cur_frame,:] = out1
+        y2_all[idx:cur_frame,:] = out2
 
         # Print.
         if cnt % 100 == 0:
