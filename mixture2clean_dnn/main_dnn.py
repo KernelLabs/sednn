@@ -252,6 +252,7 @@ def inference(args):
         # Predict. 
         pred = model.predict([input1_3d, input2])
         print(cnt, na)
+        sys.stdout.flush()
 
         # Inverse scale. 
         if scale:
