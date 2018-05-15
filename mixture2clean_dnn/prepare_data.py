@@ -337,6 +337,7 @@ def pack_features(args):
         x2_all[idx:cur_frame,:] = input2
         y_all[idx:cur_frame,:] = out1
         y2_all[idx:cur_frame,:] = out2
+        idx = cur_frame
 
         # Print.
         if cnt % 100 == 0:
