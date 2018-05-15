@@ -1,3 +1,5 @@
 runme.sh
 pesq
 *.pyc
+.idea
+.ipynb_checkpoints

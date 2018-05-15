@@ -294,11 +294,19 @@ def pack_features(args):
     n_concat = args.n_concat
     n_hop = args.n_hop
     n_noise_frame = args.noise_frame
+    input_dim1 = (257 + 40 +30) * 2
+    input_dim2 = (257 + 40+30)
+    out_dim1 = (257 + 40+30) * 2
+    out_dim1_irm = 257 + 40 +64
+    out_dim2 = (257 + 40+30)
+    out_dim2_irm = (257 + 40+64)
 
-    x_all = []  # (n_segs, n_concat, n_freq)
-    y_all = []  # (n_segs, n_freq)
-    y2_all = []
-    x2_all = []
+    # x_all = []  # (n_segs, n_concat, n_freq)
+    x_all = np.empty((0,n_concat,input_dim1))
+    y_all = np.empty((0,out_dim1+out_dim1_irm))
+    # y_all = []  # (n_segs, n_freq)
+    y2_all = np.empty((0,out_dim2+out_dim2_irm))
+    x2_all = np.empty((0,input_dim2))
 
     cnt = 0
     t1 = time.time()
@@ -314,10 +322,10 @@ def pack_features(args):
         [mixed_complx_x, speech_x, noise_x, alpha, na] = data
         input1_3d, input2, out1, out2 = get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat,
                                                                n_noise_frame, n_hop, mel_basis)
-        x_all.append(input1_3d)
-        x2_all.append(input2)
-        y_all.append(out1)
-        y2_all.append(out2)
+        x_all = np.concatenate((x_all,input1_3d),axis=0)
+        x2_all = np.concatenate((x2_all,input2),axis=0)
+        y_all = np.concatenate((y_all,out1),axis=0)
+        y2_all = np.concatenate((y2_all,out2),axis=0)
 
         # Print.
         if cnt % 100 == 0:
@@ -327,10 +335,10 @@ def pack_features(args):
         # if cnt == 3: break
         cnt += 1
 
-    x_all = np.concatenate(x_all, axis=0)  # (n_segs, n_concat, n_freq)
-    y_all = np.concatenate(y_all, axis=0)  # (n_segs, n_freq)
-    x2_all = np.concatenate(x2_all, axis=0)  # (n_segs, n_concat, n_freq)
-    y2_all = np.concatenate(y2_all, axis=0)  # (n_segs, n_freq)
+    # x_all = np.concatenate(x_all, axis=0)  # (n_segs, n_concat, n_freq)
+    # y_all = np.concatenate(y_all, axis=0)  # (n_segs, n_freq)
+    # x2_all = np.concatenate(x2_all, axis=0)  # (n_segs, n_concat, n_freq)
+    # y2_all = np.concatenate(y2_all, axis=0)  # (n_segs, n_freq)
 
     # x_all = log_sp(x_all).astype(np.float32)
     # y_all = log_sp(y_all).astype(np.float32)
