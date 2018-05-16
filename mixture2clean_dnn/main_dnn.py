@@ -271,19 +271,21 @@ def inference(args):
 
         # Debug plot. 
         if args.visualize:
-            # fig, axs = plt.subplots(3, 1, sharex=False)
-            # axs[0].matshow(np.abs(mixed_cmplx_x.T), origin='lower', aspect='auto', cmap='jet')
-            # axs[1].matshow(speech_x.T, origin='lower', aspect='auto', cmap='jet')
-            # axs[2].matshow(pred_speech_lps.T, origin='lower', aspect='auto', cmap='jet')
-            # axs[0].set_title("%ddb mixture log spectrogram" % int(te_snr))
-            # axs[1].set_title("Clean speech log spectrogram")
-            # axs[2].set_title("Enhanced speech log spectrogram")
-            # for j1 in xrange(3):
-            #     axs[j1].xaxis.tick_bottom()
-            # plt.tight_layout()
+            out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.all.png" % na)
+            pp_data.create_folder(os.path.dirname(out_path))
+            fig, axs = plt.subplots(3, 1, sharex=False)
+            axs[0].matshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08), origin='lower', aspect='auto', cmap='jet')
+            axs[1].matshow(np.log(speech_x.T+1e-08), origin='lower', aspect='auto', cmap='jet')
+            axs[2].matshow(pred_speech_lps.T, origin='lower', aspect='auto', cmap='jet')
+            axs[0].set_title("%ddb mixture log spectrogram" % int(te_snr))
+            axs[1].set_title("Clean speech log spectrogram")
+            axs[2].set_title("Enhanced speech log spectrogram")
+            for j1 in xrange(3):
+                axs[j1].xaxis.tick_bottom()
+            plt.tight_layout()
+            plt.savefig(out_path)
             # plt.show()
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.mixture.png" % na)
-            pp_data.create_folder(os.path.dirname(out_path))
             display.specshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08))
             plt.title("%ddb mixture log spectrogram" % int(te_snr))
             plt.savefig(out_path)
