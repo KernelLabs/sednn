@@ -284,6 +284,7 @@ def inference(args):
                 axs[j1].xaxis.tick_bottom()
             plt.tight_layout()
             plt.savefig(out_path)
+            plt.close('all')
             # plt.show()
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.mixture.png" % na)
             display.specshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08))
