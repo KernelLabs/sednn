@@ -20,6 +20,7 @@ import config as cfg
 from data_generator import DataGenerator
 from spectrogram_to_wave import recover_wav
 import librosa
+import librosa.display as display
 
 from keras.models import *
 from keras.layers import *
@@ -270,19 +271,29 @@ def inference(args):
 
         # Debug plot. 
         if args.visualize:
-            fig, axs = plt.subplots(3, 1, sharex=False)
-            axs[0].matshow(np.abs(mixed_cmplx_x.T), origin='lower', aspect='auto', cmap='jet')
-            axs[1].matshow(speech_x.T, origin='lower', aspect='auto', cmap='jet')
-            axs[2].matshow(pred_speech_lps.T, origin='lower', aspect='auto', cmap='jet')
-            axs[0].set_title("%ddb mixture log spectrogram" % int(te_snr))
-            axs[1].set_title("Clean speech log spectrogram")
-            axs[2].set_title("Enhanced speech log spectrogram")
-            for j1 in xrange(3):
-                axs[j1].xaxis.tick_bottom()
-            plt.tight_layout()
+            # fig, axs = plt.subplots(3, 1, sharex=False)
+            # axs[0].matshow(np.abs(mixed_cmplx_x.T), origin='lower', aspect='auto', cmap='jet')
+            # axs[1].matshow(speech_x.T, origin='lower', aspect='auto', cmap='jet')
+            # axs[2].matshow(pred_speech_lps.T, origin='lower', aspect='auto', cmap='jet')
+            # axs[0].set_title("%ddb mixture log spectrogram" % int(te_snr))
+            # axs[1].set_title("Clean speech log spectrogram")
+            # axs[2].set_title("Enhanced speech log spectrogram")
+            # for j1 in xrange(3):
+            #     axs[j1].xaxis.tick_bottom()
+            # plt.tight_layout()
             # plt.show()
-            out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.enh.png" % na)
+            out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.mixture.png" % na)
             pp_data.create_folder(os.path.dirname(out_path))
+            display.specshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08))
+            plt.title("%ddb mixture log spectrogram" % int(te_snr))
+            plt.savefig(out_path)
+            out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.clean.png" % na)
+            display.specshow(np.log(speech_x.T+1e-08))
+            plt.title("Clean speech log spectrogram")
+            plt.savefig(out_path)
+            out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.enh.png" % na)
+            display.specshow(pred_speech_lps.T)
+            plt.title("Enhanced speech log spectrogram")
             plt.savefig(out_path)
 
         # Recover enhanced wav.
