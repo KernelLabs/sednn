@@ -174,8 +174,7 @@ def calculate_mixture_features(args):
         # Write out mixed audio. 
         out_bare_na = os.path.join("%s.%s" %
                                    (os.path.splitext(speech_na)[0], os.path.splitext(noise_na)[0]))
-        out_audio_path = os.path.join(workspace, "mixed_audios", "spectrogram",
-                                      data_type, "%ddb" % int(snr), "%s.wav" % out_bare_na)
+        out_audio_path = os.path.join(workspace, "mixed_audios", data_type, "%ddb" % int(snr), "%s.wav" % out_bare_na)
         create_folder(os.path.dirname(out_audio_path))
         write_audio(out_audio_path, mixed_audio, fs)
 

@@ -297,6 +297,7 @@ def inference(args):
             display.specshow(pred_speech_lps.T)
             plt.title("Enhanced speech log spectrogram")
             plt.savefig(out_path)
+            plt.close('all')
 
         # Recover enhanced wav.
         pred_sp = np.exp(pred_speech_lps)
