@@ -565,16 +565,16 @@ def inverse_scale_on_2d(x2d, scaler):
 def load_hdf5(hdf5_path):
     """Load hdf5 data. 
     """
-    with h5py.File(hdf5_path, 'r') as hf:
-        x1 = hf.get('x1')
-        y1 = hf.get('y1')
-        x1 = np.array(x1)  # (n_segs, n_concat, n_freq)
-        y1 = np.array(y1)  # (n_segs, n_freq)
-        x2 = hf.get('x2')
-        y2 = hf.get('y2')
-        x2 = np.array(x2)  # (n_segs, n_concat, n_freq)
-        y2 = np.array(y2)  # (n_segs, n_freq)
-    return x1, x2, y1, y2
+    hf = h5py.File(hdf5_path, 'r')
+    x1 = hf.get('x1')
+    y1 = hf.get('y1')
+    # x1 = np.array(x1)  # (n_segs, n_concat, n_freq)
+    # y1 = np.array(y1)  # (n_segs, n_freq)
+    x2 = hf.get('x2')
+    y2 = hf.get('y2')
+    # x2 = np.array(x2)  # (n_segs, n_concat, n_freq)
+    # y2 = np.array(y2)  # (n_segs, n_freq)
+    return hf, x1, x2, y1, y2
 
 
 def np_mean_absolute_error(y_true, y_pred):

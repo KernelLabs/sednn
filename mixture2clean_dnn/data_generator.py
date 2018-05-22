@@ -36,4 +36,4 @@ class DataGenerator(object):
  
             batch_idx = index[pointer : min(pointer + batch_size, n_samples)]
             pointer += batch_size
-            yield [x1[batch_idx],x2[batch_idx]], [y1[batch_idx],y2[batch_idx]]
+            yield [np.array(x1)[batch_idx],np.array(x2)[batch_idx]], [np.array(y1)[batch_idx],np.array(y2)[batch_idx]]
