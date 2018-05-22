@@ -60,12 +60,14 @@ def create_mixture_csv(args):
     workspace = args.workspace
     speech_dir = args.speech_dir
     noise_dir = args.noise_dir
+    interfere_dir = args.interfere_dir
     data_type = args.data_type
     magnification = args.magnification
     fs = cfg.sample_rate
 
     speech_names = [na for na in os.listdir(speech_dir) if na.lower().endswith(".wav")]
     noise_names = [na for na in os.listdir(noise_dir) if na.lower().endswith(".wav")]
+    interfere_names = [na for na in os.listdir(interfere_dir) if na.lower().endswith(".wav")]
 
     rs = np.random.RandomState(0)
     out_csv_path = os.path.join(workspace, "mixture_csvs", "%s.csv" % data_type)
@@ -73,7 +75,7 @@ def create_mixture_csv(args):
 
     cnt = 0
     f = open(out_csv_path, 'w')
-    f.write("%s\t%s\t%s\t%s\n" % ("speech_name", "noise_name", "noise_onset", "noise_offset"))
+    f.write("%s\t%s\t%s\t%s\t%s\t%s\n" % ("speech_name", "noise_name", "noise_onset", "noise_offset", "interfere_onset", "interfere_offset"))
     for speech_na in speech_names:
         # Read speech. 
         speech_path = os.path.join(speech_dir, speech_na)
@@ -83,23 +85,36 @@ def create_mixture_csv(args):
         # For training data, mix each speech with randomly picked #magnification noises. 
         if data_type == 'train':
             selected_noise_names = rs.choice(noise_names, size=magnification, replace=False)
-        # For test data, mix each speech with all noises. 
+        # For test data, mix each speech with all noises.
         elif data_type == 'test':
             selected_noise_names = noise_names
         else:
             raise Exception("data_type must be train | test!")
 
+        selected_interfere_names = rs.choice(interfere_names,size=1,replace=False)
+
         # Mix one speech with different noises many times. 
-        for noise_na in selected_noise_names:
+        for idx, noise_na in enumerate(selected_noise_names):
             noise_path = os.path.join(noise_dir, noise_na)
             (noise_audio, _) = read_audio(noise_path, fs)
+            interfere_path = os.path.join(interfere_dir, selected_interfere_names[0])
+            interfere_audio, _ = read_audio(interfere_path, fs)
+            len_infer = len(interfere_audio)
+
+            if len_infer <= len_speech:
+                infer_onset = 0
+                infer_offset = len_speech
+            # If noise longer than speech then randomly select a segment of noise.
+            else:
+                infer_onset = rs.randint(0, len_infer - len_speech, size=1)[0]
+                infer_offset = infer_onset + len_speech
 
             len_noise = len(noise_audio)
 
             if len_noise <= len_speech:
                 noise_onset = 0
                 nosie_offset = len_speech
-            # If noise longer than speech then randomly select a segment of noise. 
+            # If noise longer than speech then randomly select a segment of noise.
             else:
                 noise_onset = rs.randint(0, len_noise - len_speech, size=1)[0]
                 nosie_offset = noise_onset + len_speech
@@ -108,7 +123,7 @@ def create_mixture_csv(args):
                 print cnt
 
             cnt += 1
-            f.write("%s\t%s\t%d\t%d\n" % (speech_na, noise_na, noise_onset, nosie_offset))
+            f.write("%s\t%s\t%s\t%d\t%d\t%d\t%d\n" % (speech_na, noise_na,selected_interfere_names[0], noise_onset, nosie_offset,  infer_onset, infer_offset))
     f.close()
     print(out_csv_path)
     print("Create %s mixture csv finished!" % data_type)
@@ -129,8 +144,10 @@ def calculate_mixture_features(args):
     workspace = args.workspace
     speech_dir = args.speech_dir
     noise_dir = args.noise_dir
+    interfere_dir = args.interfere_dir
     data_type = args.data_type
     snr = args.snr
+    interfere_snr = args.interfere_snr
     fs = cfg.sample_rate
 
     # Open mixture csv. 
@@ -143,9 +160,11 @@ def calculate_mixture_features(args):
     cnt = 0
     total_frame = 0
     for i1 in xrange(1, len(lis)):
-        [speech_na, noise_na, noise_onset, noise_offset] = lis[i1]
+        [speech_na, noise_na,interfere_na, noise_onset, noise_offset,  interfere_onset, interfere_offset] = lis[i1]
         noise_onset = int(noise_onset)
         noise_offset = int(noise_offset)
+        interfere_onset = int(interfere_onset)
+        interfere_offset = int(interfere_offset)
 
         # Read speech audio. 
         speech_path = os.path.join(speech_dir, speech_na)
@@ -155,7 +174,9 @@ def calculate_mixture_features(args):
         noise_path = os.path.join(noise_dir, noise_na)
         (noise_audio, _) = read_audio(noise_path, target_fs=fs)
 
-        # Repeat noise to the same length as speech. 
+        interfere_path = os.path.join(interfere_dir, interfere_na)
+        (interfere_audio, _) = read_audio(interfere_path, target_fs=fs)
+        # Repeat noise to the same length as speech.
         if len(noise_audio) < len(speech_audio):
             n_repeat = int(np.ceil(float(len(speech_audio)) / float(len(noise_audio))))
             noise_audio_ex = np.tile(noise_audio, n_repeat)
@@ -164,24 +185,35 @@ def calculate_mixture_features(args):
         else:
             noise_audio = noise_audio[noise_onset: noise_offset]
 
-        # Scale speech to given snr. 
+        # Repeat noise to the same length as speech.
+        if len(interfere_audio) < len(speech_audio):
+            n_repeat = int(np.ceil(float(len(speech_audio)) / float(len(interfere_audio))))
+            interfere_audio_ex = np.tile(interfere_audio, n_repeat)
+            interfere_audio = interfere_audio_ex[0: len(speech_audio)]
+        # Truncate noise to the same length as speech.
+        else:
+            interfere_audio = interfere_audio[interfere_onset: interfere_offset]
+        # Scale speech to given snr.
         scaler = get_amplitude_scaling_factor(speech_audio, noise_audio, snr=snr)
         speech_audio *= scaler
+        scaler = get_amplitude_scaling_factor(speech_audio, interfere_audio, snr=interfere_snr)
+        interfere_audio /= scaler
 
         # Get normalized mixture, speech, noise. 
         (mixed_audio, speech_audio, noise_audio, alpha) = additive_mixing(speech_audio, noise_audio)
+        (mixed_audio2, mixed_audio, interfere_audio, alpha) = additive_mixing(mixed_audio, interfere_audio)
 
         # Write out mixed audio. 
         out_bare_na = os.path.join("%s.%s" %
                                    (os.path.splitext(speech_na)[0], os.path.splitext(noise_na)[0]))
         out_audio_path = os.path.join(workspace, "mixed_audios", data_type, "%ddb" % int(snr), "%s.wav" % out_bare_na)
         create_folder(os.path.dirname(out_audio_path))
-        write_audio(out_audio_path, mixed_audio, fs)
+        write_audio(out_audio_path, mixed_audio2, fs)
 
         # Extract spectrogram. 
         mixed_complx_x = calc_sp(mixed_audio, mode='complex')
         speech_x = calc_sp(speech_audio, mode='magnitude')
-        noise_x = calc_sp(noise_audio, mode='magnitude')
+        noise_x = calc_sp(noise_audio+interfere_audio, mode='magnitude')
         total_frame += mixed_complx_x.shape[0]
 
         # Write out features. 
@@ -557,6 +589,7 @@ if __name__ == '__main__':
     parser_create_mixture_csv.add_argument('--workspace', type=str, required=True)
     parser_create_mixture_csv.add_argument('--speech_dir', type=str, required=True)
     parser_create_mixture_csv.add_argument('--noise_dir', type=str, required=True)
+    parser_create_mixture_csv.add_argument('--interfere_dir', type=str, required=True)
     parser_create_mixture_csv.add_argument('--data_type', type=str, required=True)
     parser_create_mixture_csv.add_argument('--magnification', type=int, default=1)
 
@@ -564,8 +597,10 @@ if __name__ == '__main__':
     parser_calculate_mixture_features.add_argument('--workspace', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--speech_dir', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--noise_dir', type=str, required=True)
+    parser_calculate_mixture_features.add_argument('--interfere_dir', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--data_type', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--snr', type=float, required=True)
+    parser_calculate_mixture_features.add_argument('--interfere_snr', type=float, required=True)
 
     parser_pack_features = subparsers.add_parser('pack_features')
     parser_pack_features.add_argument('--workspace', type=str, required=True)
