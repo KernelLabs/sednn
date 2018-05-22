@@ -14,12 +14,14 @@ if [ $MINIDATA -eq 0 ]; then
   echo "Using mini data. "
   ITERATION=500
 else
-  WORKSPACE="/home/ubuntu/data/workspace"
+  WORKSPACE="/home/ubuntu/workspace"
   mkdir -p $WORKSPACE
-  TR_SPEECH_DIR="/home/ubuntu/data/timit/train"
+  TR_SPEECH_DIR="/home/ubuntu/data/train_speech"
   TR_NOISE_DIR="/home/ubuntu/data/noise/train3"
-  TE_SPEECH_DIR="/home/ubuntu/data/timit/test2"
+  TR_INTERFERE_DIR="/home/ubuntu/data/train_interfere"
+  TE_SPEECH_DIR="/home/ubuntu/data/timit/test_speech"
   TE_NOISE_DIR="/home/ubuntu/data/noise/test3"
+  TE_INTERFERE_DIR="/home/ubuntu/data/test_interfere"
   echo "Using full data. "
   ITERATION=100000
 fi
