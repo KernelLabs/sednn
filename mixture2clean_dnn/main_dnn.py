@@ -108,12 +108,12 @@ def train(args):
     # Build model
     (_, n_concat, n_freq) = tr_x1.shape
     n_hid = 2048
-    input_dim1 = (257 + 40 +30) * 2
-    input_dim2 = (257 + 40+30)
-    out_dim1 = (257 + 40+30) * 2
-    out_dim1_irm = 257 + 40 +64
-    out_dim2 = (257 + 40+30)
-    out_dim2_irm = (257 + 40+64)
+    input_dim1 = (257 + 40 + 30) * 2
+    input_dim2 = (257 + 40 + 30)
+    out_dim1 = (257 + 40 + 30) * 2
+    out_dim1_irm = 257 + 40 + 64
+    out_dim2 = (257 + 40 + 30)
+    out_dim2_irm = (257 + 40 + 64)
 
     # model = Sequential()
     # model.add(Flatten(input_shape=(n_concat, n_freq)))
@@ -147,7 +147,7 @@ def train(args):
     model.summary()
     sys.stdout.flush()
     model.compile(loss='mean_absolute_error',
-                  optimizer=Adam(lr=lr,epsilon=1e-03))
+                  optimizer=Adam(lr=lr, epsilon=1e-03))
     # Data generator.
     tr_gen = DataGenerator(batch_size=batch_size, type='train')
     eval_te_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100)
@@ -194,12 +194,12 @@ def train(args):
             cPickle.dump(stat_dict, open(stat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
         # Save model. 
-        if iter % (iteration/20) == 0:
+        if iter % (iteration / 20) == 0:
             model_path = os.path.join(model_dir, "md_%diters.h5" % iter)
             model.save(model_path)
             print("Saved model to %s" % model_path)
 
-        if iter == iteration+1:
+        if iter == iteration + 1:
             break
 
     print("Training time: %s s" % (time.time() - t1,))
@@ -274,8 +274,8 @@ def inference(args):
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.all.png" % na)
             pp_data.create_folder(os.path.dirname(out_path))
             fig, axs = plt.subplots(3, 1, sharex=False)
-            axs[0].matshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08), origin='lower', aspect='auto', cmap='jet')
-            axs[1].matshow(np.log(speech_x.T+1e-08), origin='lower', aspect='auto', cmap='jet')
+            axs[0].matshow(np.log(np.abs(mixed_cmplx_x.T) + 1e-08), origin='lower', aspect='auto', cmap='jet')
+            axs[1].matshow(np.log(speech_x.T + 1e-08), origin='lower', aspect='auto', cmap='jet')
             axs[2].matshow(pred_speech_lps.T, origin='lower', aspect='auto', cmap='jet')
             axs[0].set_title("%ddb mixture log spectrogram" % int(te_snr))
             axs[1].set_title("Clean speech log spectrogram")
@@ -287,11 +287,11 @@ def inference(args):
             plt.close('all')
             # plt.show()
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.mixture.png" % na)
-            display.specshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08))
+            display.specshow(np.log(np.abs(mixed_cmplx_x.T) + 1e-08))
             plt.title("%ddb mixture log spectrogram" % int(te_snr))
             plt.savefig(out_path)
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.clean.png" % na)
-            display.specshow(np.log(speech_x.T+1e-08))
+            display.specshow(np.log(speech_x.T + 1e-08))
             plt.title("Clean speech log spectrogram")
             plt.savefig(out_path)
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.enh.png" % na)

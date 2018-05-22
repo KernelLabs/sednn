@@ -199,7 +199,7 @@ def calculate_mixture_features(args):
         cnt += 1
 
     print("Extracting feature time: %s" % (time.time() - t1))
-    total_frame_path = os.path.join(workspace, "total_frame", "%s.p"%data_type)
+    total_frame_path = os.path.join(workspace, "total_frame", "%s.p" % data_type)
     create_folder(os.path.dirname(total_frame_path))
     cPickle.dump(total_frame, open(total_frame_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
@@ -298,23 +298,22 @@ def pack_features(args):
     n_concat = args.n_concat
     n_hop = args.n_hop
     n_noise_frame = args.noise_frame
-    input_dim1 = (257 + 40 +30) * 2
-    input_dim2 = (257 + 40+30)
-    out_dim1 = (257 + 40+30) * 2
-    out_dim1_irm = 257 + 40 +64
-    out_dim2 = (257 + 40+30)
-    out_dim2_irm = (257 + 40+64)
+    input_dim1 = (257 + 40 + 30) * 2
+    input_dim2 = (257 + 40 + 30)
+    out_dim1 = (257 + 40 + 30) * 2
+    out_dim1_irm = 257 + 40 + 64
+    out_dim2 = (257 + 40 + 30)
+    out_dim2_irm = (257 + 40 + 64)
 
-    total_frame_path = os.path.join(workspace, "total_frame", "%s.p"%data_type)
+    total_frame_path = os.path.join(workspace, "total_frame", "%s.p" % data_type)
     total_frame = cPickle.load(open(total_frame_path, 'rb'))
 
     # x_all = []  # (n_segs, n_concat, n_freq)
-    x_all = np.zeros((total_frame,n_concat,input_dim1))
-    y_all = np.zeros((total_frame,out_dim1+out_dim1_irm))
+    x_all = np.zeros((total_frame, n_concat, input_dim1))
+    y_all = np.zeros((total_frame, out_dim1 + out_dim1_irm))
     # y_all = []  # (n_segs, n_freq)
-    y2_all = np.zeros((total_frame,out_dim2+out_dim2_irm))
-    x2_all = np.zeros((total_frame,input_dim2))
-
+    y2_all = np.zeros((total_frame, out_dim2 + out_dim2_irm))
+    x2_all = np.zeros((total_frame, input_dim2))
 
     cnt = 0
     t1 = time.time()
@@ -328,10 +327,10 @@ def pack_features(args):
     out_path = os.path.join(workspace, "packed_features", "spectrogram", data_type, "%ddb" % int(snr), "data.h5")
     create_folder(os.path.dirname(out_path))
     with h5py.File(out_path, 'w') as hf:
-        x1 = hf.create_dataset('x1', (total_frame,n_concat,input_dim1))
-        x2 = hf.create_dataset('x2', (total_frame,input_dim2))
-        y1 = hf.create_dataset('y1', (total_frame,out_dim1+out_dim1_irm))
-        y2 = hf.create_dataset('y2', (total_frame,out_dim2+out_dim2_irm))
+        x1 = hf.create_dataset('x1', (total_frame, n_concat, input_dim1))
+        x2 = hf.create_dataset('x2', (total_frame, input_dim2))
+        y1 = hf.create_dataset('y1', (total_frame, out_dim1 + out_dim1_irm))
+        y2 = hf.create_dataset('y2', (total_frame, out_dim2 + out_dim2_irm))
         for na in names:
             # Load feature.
             feat_path = os.path.join(feat_dir, na)
@@ -339,11 +338,11 @@ def pack_features(args):
             [mixed_complx_x, speech_x, noise_x, alpha, na] = data
             input1_3d, input2, out1, out2 = get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat,
                                                                    n_noise_frame, n_hop, mel_basis)
-            cur_frame = idx+input1_3d.shape[0]
-            x1[idx:cur_frame,:,:] = input1_3d
-            x2[idx:cur_frame,:] = input2
-            y1[idx:cur_frame,:] = out1
-            y2[idx:cur_frame,:] = out2
+            cur_frame = idx + input1_3d.shape[0]
+            x1[idx:cur_frame, :, :] = input1_3d
+            x2[idx:cur_frame, :] = input2
+            y1[idx:cur_frame, :] = out1
+            y2[idx:cur_frame, :] = out2
             idx = cur_frame
 
             # Print.
@@ -362,7 +361,6 @@ def pack_features(args):
     # x_all = log_sp(x_all).astype(np.float32)
     # y_all = log_sp(y_all).astype(np.float32)
 
-
     print("Write out to %s" % out_path)
     print("Pack features finished! %s s" % (time.time() - t1,))
     sys.stdout.flush()
@@ -372,29 +370,29 @@ def get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat, n
     n_pad = (n_concat - 1)
     n = mixed_complx_x.shape[0]
 
-    noisy_lps =np.log((np.abs(mixed_complx_x))**2+1e-08)
+    noisy_lps = np.log((np.abs(mixed_complx_x)) ** 2 + 1e-08)
     static_noise_lps = np.average(noisy_lps[:n_noise_frame, :], axis=0)
-    clean_lps = np.log((np.abs(speech_x))**2)
-    noise_lps = np.log((np.abs(noise_x))**2)
-    noisy_mel_spec = np.dot(mel_basis,np.abs(mixed_complx_x.T))
-    clean_mel_spec = np.dot(mel_basis,np.abs(speech_x.T))
-    noise_mel_spec = np.dot(mel_basis,np.abs(noise_x.T))
-    noisy_mfcc = librosa.feature.mfcc(S=np.log(noisy_mel_spec),n_mfcc=40).T
-    clean_mfcc = librosa.feature.mfcc(S=np.log(clean_mel_spec),n_mfcc=40).T
-    noise_mfcc = librosa.feature.mfcc(S=np.log(noise_mel_spec),n_mfcc=40).T
+    clean_lps = np.log((np.abs(speech_x)) ** 2)
+    noise_lps = np.log((np.abs(noise_x)) ** 2)
+    noisy_mel_spec = np.dot(mel_basis, np.abs(mixed_complx_x.T))
+    clean_mel_spec = np.dot(mel_basis, np.abs(speech_x.T))
+    noise_mel_spec = np.dot(mel_basis, np.abs(noise_x.T))
+    noisy_mfcc = librosa.feature.mfcc(S=np.log(noisy_mel_spec), n_mfcc=40).T
+    clean_mfcc = librosa.feature.mfcc(S=np.log(clean_mel_spec), n_mfcc=40).T
+    noise_mfcc = librosa.feature.mfcc(S=np.log(noise_mel_spec), n_mfcc=40).T
     static_noise_mfcc = np.average(noisy_mfcc[:n_noise_frame, :], axis=0)
-    gtm = feature_extractor.fft_to_cochleagram(cfg.sample_rate,0,cfg.sample_rate/2,cfg.n_window,64)
-    noisy_gf = 1./cfg.n_window*np.matmul(gtm,np.abs(mixed_complx_x.T))
-    clean_gf = 1./cfg.n_window*np.matmul(gtm,np.abs(speech_x.T))
-    noise_gf = 1./cfg.n_window*np.matmul(gtm,np.abs(noise_x.T))
-    dct = librosa.filters.dct(30,64)
-    noisy_gfcc = np.dot(dct,np.power(noisy_gf,1./3)).T
-    clean_gfcc = np.dot(dct,np.power(clean_gf,1./3)).T
-    noise_gfcc = np.dot(dct,np.power(noise_gf,1./3)).T
+    gtm = feature_extractor.fft_to_cochleagram(cfg.sample_rate, 0, cfg.sample_rate / 2, cfg.n_window, 64)
+    noisy_gf = 1. / cfg.n_window * np.matmul(gtm, np.abs(mixed_complx_x.T))
+    clean_gf = 1. / cfg.n_window * np.matmul(gtm, np.abs(speech_x.T))
+    noise_gf = 1. / cfg.n_window * np.matmul(gtm, np.abs(noise_x.T))
+    dct = librosa.filters.dct(30, 64)
+    noisy_gfcc = np.dot(dct, np.power(noisy_gf, 1. / 3)).T
+    clean_gfcc = np.dot(dct, np.power(clean_gf, 1. / 3)).T
+    noise_gfcc = np.dot(dct, np.power(noise_gf, 1. / 3)).T
     static_noise_gfcc = np.average(noisy_gfcc[:n_noise_frame, :], axis=0).T
-    irm = np.abs(speech_x)**2 / (np.abs(speech_x)**2 + np.abs(noise_x)**2)
+    irm = np.abs(speech_x) ** 2 / (np.abs(speech_x) ** 2 + np.abs(noise_x) ** 2)
     irm_mel = (clean_mel_spec / (clean_mel_spec + noise_mel_spec)).T
-    irm_gf = (clean_gf / (clean_gf+ noise_gf)).T
+    irm_gf = (clean_gf / (clean_gf + noise_gf)).T
     input1 = np.empty((n, 0))
     input1 = np.hstack([input1, noisy_lps])
     input1 = np.hstack([input1, np.tile(static_noise_lps, (n, 1))])
@@ -417,7 +415,7 @@ def get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat, n
     out1 = np.hstack([out1, irm_gf])
     out1 = pad_head_with_border(out1, n_pad)
     out1_3d = mat_2d_to_3d(out1, agg_num=n_concat, hop=n_hop)
-    out1 = out1_3d[:, (n_concat - 1) , :]
+    out1 = out1_3d[:, (n_concat - 1), :]
 
     input2 = np.empty((n, 0))
     input2 = np.hstack([input2, noisy_lps])
@@ -436,7 +434,7 @@ def get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat, n
     out2 = np.hstack([out2, irm_gf])
     out2 = pad_head_with_border(out2, n_pad)
     out2_3d = mat_2d_to_3d(out2, agg_num=n_concat, hop=n_hop)
-    out2 = out2_3d[:, (n_concat - 1) , :]
+    out2 = out2_3d[:, (n_concat - 1), :]
 
     return input1_3d, input2, out1, out2
 
@@ -469,11 +467,13 @@ def pad_with_border(x, n_pad):
     x_pad_list = [x[0:1]] * n_pad + [x] + [x[-1:]] * n_pad
     return np.concatenate(x_pad_list, axis=0)
 
+
 def pad_head_with_border(x, n_pad):
     """Pad the begin and finish of spectrogram with border frame value.
     """
     x_pad_list = [x[0:1]] * n_pad + [x]
     return np.concatenate(x_pad_list, axis=0)
+
 
 ###
 def compute_scaler(args):
