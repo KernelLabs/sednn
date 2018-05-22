@@ -34,6 +34,6 @@ class DataGenerator(object):
                 pointer = 0
                 np.random.shuffle(index)                
  
-            batch_idx = index[pointer : min(pointer + batch_size, n_samples)]
+            batch_idx = sorted(index[pointer : min(pointer + batch_size, n_samples)])
             pointer += batch_size
-            yield [np.array(x1)[batch_idx],np.array(x2)[batch_idx]], [np.array(y1)[batch_idx],np.array(y2)[batch_idx]]
+            yield [np.array(x1[batch_idx]),np.array(x2[batch_idx])], [np.array(y1[batch_idx]),np.array(y2[batch_idx])]
