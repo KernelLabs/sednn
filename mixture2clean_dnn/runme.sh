@@ -4,20 +4,22 @@ set -e
 MINIDATA=0
 if [ $MINIDATA -eq 1 ]; then
   WORKSPACE="workspace"
-  mkdir $WORKSPACE
+  mkdir -p $WORKSPACE
   TR_SPEECH_DIR="mini_data/train_speech"
   TR_NOISE_DIR="mini_data/train_noise"
   TE_SPEECH_DIR="mini_data/test_speech"
   TE_NOISE_DIR="mini_data/test_noise"
   echo "Using mini data. "
+  ITERATION=1000
 else
   WORKSPACE="/home/ubuntu/data/workspace"
-  mkdir $WORKSPACE
+  mkdir -p $WORKSPACE
   TR_SPEECH_DIR="/home/ubuntu/data/timit/train"
   TR_NOISE_DIR="/home/ubuntu/data/noise/train3"
   TE_SPEECH_DIR="/home/ubuntu/data/timit/test2"
   TE_NOISE_DIR="/home/ubuntu/data/noise/test3"
   echo "Using full data. "
+  ITERATION=100000
 fi
 
 # Create mixture csv. 
@@ -43,7 +45,6 @@ python prepare_data.py pack_features --workspace=$WORKSPACE --data_type=test --s
 
 # Train. 
 LEARNING_RATE=1e-4
-ITERATION=100000
 python main_dnn.py train --workspace=$WORKSPACE --tr_snr=$TR_SNR --te_snr=$TE_SNR --lr=$LEARNING_RATE --iter=$ITERATION
 
 # Plot training stat. 
