@@ -356,27 +356,35 @@ def pack_features(args):
     names = os.listdir(feat_dir)
     mel_basis = librosa.filters.mel(cfg.sample_rate, cfg.n_window, n_mels=40)
     idx = 0
-    for na in names:
-        # Load feature. 
-        feat_path = os.path.join(feat_dir, na)
-        data = cPickle.load(open(feat_path, 'rb'))
-        [mixed_complx_x, speech_x, noise_x, alpha, na] = data
-        input1_3d, input2, out1, out2 = get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat,
-                                                               n_noise_frame, n_hop, mel_basis)
-        cur_frame = idx+input1_3d.shape[0]
-        x_all[idx:cur_frame,:,:] = input1_3d
-        x2_all[idx:cur_frame,:] = input2
-        y_all[idx:cur_frame,:] = out1
-        y2_all[idx:cur_frame,:] = out2
-        idx = cur_frame
+    # Write out data to .h5 file.
+    out_path = os.path.join(workspace, "packed_features", "spectrogram", data_type, "%ddb" % int(snr), "data.h5")
+    create_folder(os.path.dirname(out_path))
+    with h5py.File(out_path, 'w') as hf:
+        x1 = hf.create_dataset('x1',(total_frame,n_concat,input_dim1))
+        x2 = hf.create_dataset('x2', (total_frame,input_dim2))
+        y1 = hf.create_dataset('y1',(total_frame,out_dim1+out_dim1_irm))
+        y2 = hf.create_dataset('y2',(total_frame,out_dim2+out_dim2_irm))
+        for na in names:
+            # Load feature.
+            feat_path = os.path.join(feat_dir, na)
+            data = cPickle.load(open(feat_path, 'rb'))
+            [mixed_complx_x, speech_x, noise_x, alpha, na] = data
+            input1_3d, input2, out1, out2 = get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat,
+                                                                   n_noise_frame, n_hop, mel_basis)
+            cur_frame = idx+input1_3d.shape[0]
+            x1[idx:cur_frame,:,:] = input1_3d
+            x2[idx:cur_frame,:] = input2
+            y1[idx:cur_frame,:] = out1
+            y2[idx:cur_frame,:] = out2
+            idx = cur_frame
 
-        # Print.
-        if cnt % 100 == 0:
-            print(cnt)
-            sys.stdout.flush()
+            # Print.
+            if cnt % 100 == 0:
+                print(cnt)
+                sys.stdout.flush()
 
-        # if cnt == 3: break
-        cnt += 1
+            # if cnt == 3: break
+            cnt += 1
 
     # x_all = np.concatenate(x_all, axis=0)  # (n_segs, n_concat, n_freq)
     # y_all = np.concatenate(y_all, axis=0)  # (n_segs, n_freq)
@@ -386,14 +394,6 @@ def pack_features(args):
     # x_all = log_sp(x_all).astype(np.float32)
     # y_all = log_sp(y_all).astype(np.float32)
 
-    # Write out data to .h5 file. 
-    out_path = os.path.join(workspace, "packed_features", "spectrogram", data_type, "%ddb" % int(snr), "data.h5")
-    create_folder(os.path.dirname(out_path))
-    with h5py.File(out_path, 'w') as hf:
-        hf.create_dataset('x1', data=x_all)
-        hf.create_dataset('x2', data=x2_all)
-        hf.create_dataset('y1', data=y_all)
-        hf.create_dataset('y2', data=y2_all)
 
     print("Write out to %s" % out_path)
     print("Pack features finished! %s s" % (time.time() - t1,))
