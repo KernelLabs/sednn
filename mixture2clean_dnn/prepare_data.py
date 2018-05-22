@@ -121,6 +121,7 @@ def create_mixture_csv(args):
 
             if cnt % 100 == 0:
                 print cnt
+                sys.stdout.flush()
 
             cnt += 1
             f.write("%s\t%s\t%s\t%d\t%d\t%d\t%d\n" % (speech_na, noise_na,selected_interfere_names[0], noise_onset, nosie_offset,  infer_onset, infer_offset))
