@@ -7,7 +7,7 @@ class DataGenerator(object):
         self._type_ = type
         self._te_max_iter_ = te_max_iter
         
-    def generate(self, xs, ys):
+    def generate(self, xs, ys, adapt_utt):
         x1 = xs[0]
         x2 = xs[1]
 
@@ -36,4 +36,4 @@ class DataGenerator(object):
  
             batch_idx = index[pointer : min(pointer + batch_size, n_samples)]
             pointer += batch_size
-            yield [x1[batch_idx],x2[batch_idx]], [y1[batch_idx],y2[batch_idx]]
+            yield [x1[batch_idx],x2[batch_idx], adapt_utt[name]], [y1[batch_idx],y2[batch_idx]]

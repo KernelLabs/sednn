@@ -18,7 +18,6 @@ import cPickle
 import h5py
 from sklearn import preprocessing
 import librosa
-import prepare_data as pp_data
 import config as cfg
 import feature_extractor
 
@@ -66,14 +65,15 @@ def create_mixture_csv(args):
 
     speech_names = [na for na in os.listdir(speech_dir) if na.lower().endswith(".wav")]
     noise_names = [na for na in os.listdir(noise_dir) if na.lower().endswith(".wav")]
+    interfere_names = speech_names[:]
 
     rs = np.random.RandomState(0)
     out_csv_path = os.path.join(workspace, "mixture_csvs", "%s.csv" % data_type)
-    pp_data.create_folder(os.path.dirname(out_csv_path))
+    create_folder(os.path.dirname(out_csv_path))
 
     cnt = 0
     f = open(out_csv_path, 'w')
-    f.write("%s\t%s\t%s\t%s\n" % ("speech_name", "noise_name", "noise_onset", "noise_offset"))
+    f.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % ("speech_name", "noise_name", "interfere_name", "noise_onset", "noise_offset", "interfere_onset", "interfere_offset"))
     for speech_na in speech_names:
         # Read speech. 
         speech_path = os.path.join(speech_dir, speech_na)
@@ -88,6 +88,9 @@ def create_mixture_csv(args):
             selected_noise_names = noise_names
         else:
             raise Exception("data_type must be train | test!")
+        interfere_na = rs.choice(interfere_names)
+        while interfere_na[:9]==speech_na[:9]:
+            interfere_na = rs.choice(interfere_names)
 
         # Mix one speech with different noises many times. 
         for noise_na in selected_noise_names:
@@ -98,17 +101,30 @@ def create_mixture_csv(args):
 
             if len_noise <= len_speech:
                 noise_onset = 0
-                nosie_offset = len_speech
-            # If noise longer than speech then randomly select a segment of noise. 
+                noise_offset = len_speech
+            # If noise longer than speech then randomly select a segment of noise.
             else:
                 noise_onset = rs.randint(0, len_noise - len_speech, size=1)[0]
-                nosie_offset = noise_onset + len_speech
+                noise_offset = noise_onset + len_speech
+
+            interfere_path = os.path.join(speech_dir, interfere_na)
+            (interfere_audio, _) = read_audio(interfere_path, fs)
+
+            len_interfere = len(interfere_audio)
+
+            if len_interfere <= len_speech:
+                interfere_onset = 0
+                interfere_offset = len_speech
+            # If interfere longer than speech then randomly select a segment of interfere.
+            else:
+                interfere_onset = rs.randint(0, len_interfere - len_speech, size=1)[0]
+                interfere_offset = interfere_onset + len_speech
 
             if cnt % 100 == 0:
                 print cnt
 
             cnt += 1
-            f.write("%s\t%s\t%d\t%d\n" % (speech_na, noise_na, noise_onset, nosie_offset))
+            f.write("%s\t%s\t%s\t%d\t%d\t%d\t%d\n" % (speech_na, noise_na, interfere_na, noise_onset, noise_offset, interfere_onset, interfere_offset))
     f.close()
     print(out_csv_path)
     print("Create %s mixture csv finished!" % data_type)
@@ -131,6 +147,7 @@ def calculate_mixture_features(args):
     noise_dir = args.noise_dir
     data_type = args.data_type
     snr = args.snr
+    interfere_snr = args.interfere_snr
     fs = cfg.sample_rate
 
     # Open mixture csv. 
@@ -143,52 +160,47 @@ def calculate_mixture_features(args):
     cnt = 0
     total_frame = 0
     for i1 in xrange(1, len(lis)):
-        [speech_na, noise_na, noise_onset, noise_offset] = lis[i1]
+        [speech_na, noise_na, interfere_na, noise_onset, noise_offset, interfere_onset, interfere_offset] = lis[i1]
         noise_onset = int(noise_onset)
         noise_offset = int(noise_offset)
+        interfere_onset = int(interfere_onset)
+        interfere_offset = int(interfere_offset)
 
         # Read speech audio. 
         speech_path = os.path.join(speech_dir, speech_na)
         (speech_audio, _) = read_audio(speech_path, target_fs=fs)
 
-        # Read noise audio. 
-        noise_path = os.path.join(noise_dir, noise_na)
-        (noise_audio, _) = read_audio(noise_path, target_fs=fs)
-
-        # Repeat noise to the same length as speech. 
-        if len(noise_audio) < len(speech_audio):
-            n_repeat = int(np.ceil(float(len(speech_audio)) / float(len(noise_audio))))
-            noise_audio_ex = np.tile(noise_audio, n_repeat)
-            noise_audio = noise_audio_ex[0: len(speech_audio)]
-        # Truncate noise to the same length as speech. 
-        else:
-            noise_audio = noise_audio[noise_onset: noise_offset]
+        # Read noise audio.
+        noise_audio = load_fix_len_audio(noise_dir, noise_na, len(speech_audio), fs, noise_onset, noise_offset)
+        interfere_audio = load_fix_len_audio(speech_dir, interfere_na, len(speech_audio), fs, interfere_onset, interfere_offset)
 
         # Scale speech to given snr. 
         scaler = get_amplitude_scaling_factor(speech_audio, noise_audio, snr=snr)
         speech_audio *= scaler
+        scaler = get_amplitude_scaling_factor(speech_audio, interfere_audio, snr=interfere_snr)
+        interfere_audio /= scaler
 
         # Get normalized mixture, speech, noise. 
         (mixed_audio, speech_audio, noise_audio, alpha) = additive_mixing(speech_audio, noise_audio)
+        (mixed_audio2, mixed_audio, interfere_audio, alpha) = additive_mixing(mixed_audio, interfere_audio)
 
         # Write out mixed audio. 
-        out_bare_na = os.path.join("%s.%s" %
-                                   (os.path.splitext(speech_na)[0], os.path.splitext(noise_na)[0]))
+        out_bare_na = os.path.join("%s.%s" % (os.path.splitext(speech_na)[0], os.path.splitext(noise_na)[0]))
         out_audio_path = os.path.join(workspace, "mixed_audios", data_type, "%ddb" % int(snr), "%s.wav" % out_bare_na)
         create_folder(os.path.dirname(out_audio_path))
-        write_audio(out_audio_path, mixed_audio, fs)
+        write_audio(out_audio_path, mixed_audio2, fs)
 
         # Extract spectrogram. 
         mixed_complx_x = calc_sp(mixed_audio, mode='complex')
         speech_x = calc_sp(speech_audio, mode='magnitude')
-        noise_x = calc_sp(noise_audio, mode='magnitude')
+        noise_x = calc_sp(noise_audio+interfere_audio, mode='magnitude') # Interfere as noise
         total_frame += mixed_complx_x.shape[0]
 
         # Write out features. 
         out_feat_path = os.path.join(workspace, "features", "spectrogram",
                                      data_type, "%ddb" % int(snr), "%s.p" % out_bare_na)
         create_folder(os.path.dirname(out_feat_path))
-        data = [mixed_complx_x, speech_x, noise_x, alpha, out_bare_na]
+        data = [mixed_complx_x, speech_x, noise_x, alpha, out_bare_na, speech_na]
         cPickle.dump(data, open(out_feat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
         # Print. 
@@ -203,6 +215,19 @@ def calculate_mixture_features(args):
     create_folder(os.path.dirname(total_frame_path))
     cPickle.dump(total_frame, open(total_frame_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
+def load_fix_len_audio(dir, name, length, fs, onset, offset):
+    path = os.path.join(dir, name)
+    (audio, _) = read_audio(path, target_fs=fs)
+
+    # Repeat noise to the same length as speech.
+    if len(audio) < length:
+        n_repeat = int(np.ceil(float(length) / float(len(audio))))
+        audio_ex = np.tile(audio, n_repeat)
+        audio = audio_ex[0: length]
+    # Truncate noise to the same length as speech.
+    else:
+        audio = audio[onset: offset]
+    return audio
 
 def rms(y):
     """Root mean square. 
@@ -309,12 +334,12 @@ def pack_features(args):
     total_frame = cPickle.load(open(total_frame_path, 'rb'))
 
     # x_all = []  # (n_segs, n_concat, n_freq)
+    # y_all = []  # (n_segs, n_freq)
     x_all = np.zeros((total_frame,n_concat,input_dim1))
     y_all = np.zeros((total_frame,out_dim1+out_dim1_irm))
-    # y_all = []  # (n_segs, n_freq)
     y2_all = np.zeros((total_frame,out_dim2+out_dim2_irm))
     x2_all = np.zeros((total_frame,input_dim2))
-
+    adaptive_utterances = np.empty((total_frame),dtype='S10')
 
     cnt = 0
     t1 = time.time()
@@ -328,7 +353,7 @@ def pack_features(args):
         # Load feature. 
         feat_path = os.path.join(feat_dir, na)
         data = cPickle.load(open(feat_path, 'rb'))
-        [mixed_complx_x, speech_x, noise_x, alpha, na] = data
+        [mixed_complx_x, speech_x, noise_x, alpha, na, speech_na] = data
         input1_3d, input2, out1, out2 = get_input_output_layer(mixed_complx_x, speech_x, noise_x, alpha, n_concat,
                                                                n_noise_frame, n_hop, mel_basis)
         cur_frame = idx+input1_3d.shape[0]
@@ -336,6 +361,7 @@ def pack_features(args):
         x2_all[idx:cur_frame,:] = input2
         y_all[idx:cur_frame,:] = out1
         y2_all[idx:cur_frame,:] = out2
+        adaptive_utterances[idx:cur_frame]=speech_na[:9]
         idx = cur_frame
 
         # Print.
@@ -362,6 +388,7 @@ def pack_features(args):
         hf.create_dataset('x2', data=x2_all)
         hf.create_dataset('y1', data=y_all)
         hf.create_dataset('y2', data=y2_all)
+        hf.create_dataset('adapt_utter', data=adaptive_utterances)
 
     print("Write out to %s" % out_path)
     print("Pack features finished! %s s" % (time.time() - t1,))
@@ -535,17 +562,38 @@ def load_hdf5(hdf5_path):
     with h5py.File(hdf5_path, 'r') as hf:
         x1 = hf.get('x1')
         y1 = hf.get('y1')
-        x1 = np.array(x1)  # (n_segs, n_concat, n_freq)
-        y1 = np.array(y1)  # (n_segs, n_freq)
         x2 = hf.get('x2')
         y2 = hf.get('y2')
+        adapt_utter = hf.get('adapt_utter')
+        x1 = np.array(x1)  # (n_segs, n_concat, n_freq)
+        y1 = np.array(y1)  # (n_segs, n_freq)
         x2 = np.array(x2)  # (n_segs, n_concat, n_freq)
         y2 = np.array(y2)  # (n_segs, n_freq)
-    return x1, x2, y1, y2
+        adapt_utter = np.array(adapt_utter)  # (n_segs, n_concat, n_freq)
+    return x1, x2, y1, y2, adapt_utter
 
 
 def np_mean_absolute_error(y_true, y_pred):
     return np.mean(np.abs(y_pred - y_true))
+
+def calculate_adaptive_utterance_features(args):
+    workspace = args.workspace
+    data_type = args.data_type
+    adaptive_utterance_dir = args.ada_utt_dir
+    names = os.listdir(adaptive_utterance_dir)
+    names = set([name[:9] for name in names])
+    all_features = dict()
+    for name in names:
+        path = os.path.join(adaptive_utterance_dir, name)
+        (audio1, _) = read_audio(path+'_SA1.WAV', cfg.sample_rate)
+        audio_spec1 = calc_sp(audio1, mode='magnitude')
+        (audio2, _) = read_audio(path+'_SA2.WAV', cfg.sample_rate)
+        audio_spec2 = calc_sp(audio2, mode='magnitude')
+        all_features[name]=np.vstack([audio_spec1,audio_spec2])
+
+    out_feat_path = os.path.join(workspace, "adaptive_utterance", data_type, "adaptive_utterance_spec.p")
+    create_folder(os.path.dirname(out_feat_path))
+    cPickle.dump(all_features, open(out_feat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
 
 ###
@@ -566,6 +614,13 @@ if __name__ == '__main__':
     parser_calculate_mixture_features.add_argument('--noise_dir', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--data_type', type=str, required=True)
     parser_calculate_mixture_features.add_argument('--snr', type=float, required=True)
+    parser_calculate_mixture_features.add_argument('--interfere_snr', type=float, required=True)
+
+
+    parser_calculate_mixture_features = subparsers.add_parser('calculate_adaptive_utterance_features')
+    parser_calculate_mixture_features.add_argument('--workspace', type=str, required=True)
+    parser_calculate_mixture_features.add_argument('--ada_utt_dir', type=str, required=True)
+    parser_calculate_mixture_features.add_argument('--data_type', type=str, required=True)
 
     parser_pack_features = subparsers.add_parser('pack_features')
     parser_pack_features.add_argument('--workspace', type=str, required=True)
@@ -585,6 +640,8 @@ if __name__ == '__main__':
         create_mixture_csv(args)
     elif args.mode == 'calculate_mixture_features':
         calculate_mixture_features(args)
+    elif args.mode == 'calculate_adaptive_utterance_features':
+        calculate_adaptive_utterance_features(args)
     elif args.mode == 'pack_features':
         pack_features(args)
     elif args.mode == 'compute_scaler':

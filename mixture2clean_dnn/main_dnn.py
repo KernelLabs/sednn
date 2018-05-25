@@ -74,8 +74,8 @@ def train(args):
     t1 = time.time()
     tr_hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", "train", "%ddb" % int(tr_snr), "data.h5")
     te_hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", "test", "%ddb" % int(te_snr), "data.h5")
-    (tr_x1, tr_x2, tr_y1, tr_y2) = pp_data.load_hdf5(tr_hdf5_path)
-    (te_x1, te_x2, te_y1, te_y2) = pp_data.load_hdf5(te_hdf5_path)
+    (tr_x1, tr_x2, tr_y1, tr_y2, tr_name) = pp_data.load_hdf5(tr_hdf5_path)
+    (te_x1, te_x2, te_y1, te_y2, te_name) = pp_data.load_hdf5(te_hdf5_path)
     print(tr_x1.shape, tr_y1.shape, tr_x2.shape, tr_y2.shape)
     print(te_x1.shape, te_y1.shape, te_x2.shape, te_y2.shape)
     print("Load data time: %s s" % (time.time() - t1,))
@@ -114,18 +114,19 @@ def train(args):
     out_dim1_irm = 257 + 40 +64
     out_dim2 = (257 + 40+30)
     out_dim2_irm = (257 + 40+64)
+    num_fact = 30
 
-    # model = Sequential()
-    # model.add(Flatten(input_shape=(n_concat, n_freq)))
-    # model.add(Dense(n_hid, activation='relu'))
-    # model.add(Dropout(0.2))
-    # model.add(Dense(n_hid, activation='relu'))
-    # model.add(Dropout(0.2))
-    # model.add(Dense(n_hid, activation='relu'))
-    # model.add(Dropout(0.2))
-    # model.add(Dense(n_freq, activation='linear'))
+    adapt_input = Input(shape=(257,),name='adapt_input')
+    layer = Dense(512,activation='relu',name='adapt_dense1')(adapt_input)
+    layer = Dense(512,activation='relu',name='adapt_dense2')(layer)
+    layer = Dense(num_fact,activation='softmax',name='adapt_out')(layer)
+    alpha = Lambda(lambda x:K.sum(x,axis=0),output_shape=(num_fact,))(layer)
+    alpha2 = Lambda(lambda x:K.repeat_elements(x,n_hid,0),output_shape=(num_fact,))(alpha)
     input1 = Input(shape=(n_concat, input_dim1), name='input1')
     layer = Flatten(name='flatten')(input1)
+    layer = Dense(n_hid*num_fact, activation='relu', name='dense0')(layer)
+
+    layer = merge([layer,alpha2],mode=lambda x:x[0]*x[1],output_shape=(n_hid*num_fact,))
     layer = Dense(n_hid, activation='relu', name='dense1')(layer)
     layer = Dropout(0.2)(layer)
     layer = Dense(n_hid, activation='relu', name='dense2')(layer)
@@ -142,7 +143,7 @@ def train(args):
     partial_out2 = Dense(out_dim2, name='2_out_linear')(layer)
     partial_out2_irm = Dense(out_dim2_irm, name='2_out_irm', activation='sigmoid')(layer)
     out2 = concatenate([partial_out2, partial_out2_irm], name='out2')
-    model = Model(inputs=[input1, input2], outputs=[out1, out2])
+    model = Model(inputs=[input1, input2,adapt_input], outputs=[out1, out2])
 
     model.summary()
     sys.stdout.flush()
@@ -175,7 +176,7 @@ def train(args):
 
     # Train. 
     t1 = time.time()
-    for (batch_x, batch_y) in tr_gen.generate(xs=[tr_x1, tr_x2], ys=[tr_y1, tr_y2]):
+    for (batch_x, batch_y) in tr_gen.generate(xs=[tr_x1, tr_x2, tr_name], ys=[tr_y1, tr_y2]):
         loss = model.train_on_batch(batch_x, batch_y)
         iter += 1
 
