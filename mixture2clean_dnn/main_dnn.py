@@ -75,15 +75,15 @@ def train(args):
     t1 = time.time()
     tr_hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", "train", "%ddb" % int(tr_snr), "data.h5")
     te_hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", "test", "%ddb" % int(te_snr), "data.h5")
-    tr_adapt_utt_path = os.path.join(workspace, "adaptive_utterance",  "train", "adaptive_utterance_spec.p")
-    te_adapt_utt_path = os.path.join(workspace, "adaptive_utterance",  "test", "adaptive_utterance_spec.p")
+    tr_adapt_utt_path = os.path.join(workspace, "adaptive_utterance", "train", "adaptive_utterance_spec.p")
+    te_adapt_utt_path = os.path.join(workspace, "adaptive_utterance", "test", "adaptive_utterance_spec.p")
     tr_adapt_utt = cPickle.load(open(tr_adapt_utt_path, 'rb'))
     te_adapt_utt = cPickle.load(open(te_adapt_utt_path, 'rb'))
-    tr_adapt_utt_len_path = os.path.join(workspace, "adaptive_utterance",  "train", "adaptive_utterance_max_len.p")
-    te_adapt_utt_len_path = os.path.join(workspace, "adaptive_utterance",  "test", "adaptive_utterance_max_len.p")
+    tr_adapt_utt_len_path = os.path.join(workspace, "adaptive_utterance", "train", "adaptive_utterance_max_len.p")
+    te_adapt_utt_len_path = os.path.join(workspace, "adaptive_utterance", "test", "adaptive_utterance_max_len.p")
     tr_adapt_utt_len = cPickle.load(open(tr_adapt_utt_len_path, 'rb'))
     te_adapt_utt_len = cPickle.load(open(te_adapt_utt_len_path, 'rb'))
-    max_len=max(tr_adapt_utt_len,te_adapt_utt_len)
+    max_len = max(tr_adapt_utt_len, te_adapt_utt_len)
     (tr_x1, tr_x2, tr_y1, tr_y2, tr_name) = pp_data.load_hdf5(tr_hdf5_path)
     (te_x1, te_x2, te_y1, te_y2, te_name) = pp_data.load_hdf5(te_hdf5_path)
     print(tr_x1.shape, tr_y1.shape, tr_x2.shape, tr_y2.shape)
@@ -118,29 +118,30 @@ def train(args):
     # Build model
     (_, n_concat, n_freq) = tr_x1.shape
     n_hid = 2048
-    input_dim1 = (257 + 40 +30) * 2
-    input_dim2 = (257 + 40+30)
-    out_dim1 = (257 + 40+30) * 2
-    out_dim1_irm = 257 + 40 +64
-    out_dim2 = (257 + 40+30)
-    out_dim2_irm = (257 + 40+64)
+    input_dim1 = (257 + 40 + 30) * 2
+    input_dim2 = (257 + 40 + 30)
+    out_dim1 = (257 + 40 + 30) * 2
+    out_dim1_irm = 257 + 40 + 64
+    out_dim2 = (257 + 40 + 30)
+    out_dim2_irm = (257 + 40 + 64)
     num_fact = 30
-    def multiplication(pair_tensors):
-        x,y = pair_tensors
-        return K.sum(tf.multiply(y,K.expand_dims(x,-1)),axis=1)
 
-    adapt_input = Input(shape=(None,),name='adapt_input')
-    layer = Reshape((-1,257),name='reshape')(adapt_input)
-    layer = Dense(512,activation='relu',name='adapt_dense1')(layer)
-    layer = Dense(512,activation='relu',name='adapt_dense2')(layer)
-    layer = Dense(num_fact,activation='softmax',name='adapt_out')(layer)
-    alpha = Lambda(lambda x:K.sum(x,axis=1),output_shape=(num_fact,),name='sequence_summing')(layer)
+    def multiplication(pair_tensors):
+        x, y = pair_tensors
+        return K.sum(tf.multiply(y, K.expand_dims(x, -1)), axis=1)
+
+    adapt_input = Input(shape=(None,), name='adapt_input')
+    layer = Reshape((-1, 257), name='reshape')(adapt_input)
+    layer = Dense(512, activation='relu', name='adapt_dense1')(layer)
+    layer = Dense(512, activation='relu', name='adapt_dense2')(layer)
+    layer = Dense(num_fact, activation='softmax', name='adapt_out')(layer)
+    alpha = Lambda(lambda x: K.sum(x, axis=1), output_shape=(num_fact,), name='sequence_summing')(layer)
     # alpha2 = Lambda(lambda x:K.repeat_elements(x,n_hid,0),output_shape=(num_fact*n_hid,),name='repeat')(alpha)
     input1 = Input(shape=(n_concat, input_dim1), name='input1')
     layer = Flatten(name='flatten')(input1)
-    layer = Dense(n_hid*num_fact, name='dense0')(layer)
-    layer = Reshape((num_fact,n_hid),name='reshape2')(layer)
-    layer = Lambda(multiplication,name='multiply')([alpha,layer])
+    layer = Dense(n_hid * num_fact, name='dense0')(layer)
+    layer = Reshape((num_fact, n_hid), name='reshape2')(layer)
+    layer = Lambda(multiplication, name='multiply')([alpha, layer])
     # layer = Multiply()([alpha2,layer])
     # layer = Reshape((num_fact,n_hid))(layer)
 
@@ -160,16 +161,16 @@ def train(args):
     partial_out2 = Dense(out_dim2, name='2_out_linear')(layer)
     partial_out2_irm = Dense(out_dim2_irm, name='2_out_irm', activation='sigmoid')(layer)
     out2 = concatenate([partial_out2, partial_out2_irm], name='out2')
-    model = Model(inputs=[input1, input2,adapt_input], outputs=[out1, out2])
+    model = Model(inputs=[input1, input2, adapt_input], outputs=[out1, out2])
 
     model.summary()
     sys.stdout.flush()
     model.compile(loss='mean_absolute_error',
-                  optimizer=Adam(lr=lr,epsilon=1e-03))
+                  optimizer=Adam(lr=lr, epsilon=1e-03))
     # Data generator.
-    tr_gen = DataGenerator(batch_size=batch_size, type='train',max_len=max_len)
-    eval_te_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100,max_len=max_len)
-    eval_tr_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100,max_len=max_len)
+    tr_gen = DataGenerator(batch_size=batch_size, type='train', max_len=max_len)
+    eval_te_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100, max_len=max_len)
+    eval_tr_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100, max_len=max_len)
 
     # Directories for saving models and training stats
     model_dir = os.path.join(workspace, "models", "%ddb" % int(tr_snr))
@@ -212,12 +213,12 @@ def train(args):
             cPickle.dump(stat_dict, open(stat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
         # Save model. 
-        if iter % (iteration/20) == 0:
+        if iter % (iteration / 20) == 0:
             model_path = os.path.join(model_dir, "md_%diters.h5" % iter)
             model.save(model_path)
             print("Saved model to %s" % model_path)
 
-        if iter == iteration+1:
+        if iter == iteration + 1:
             break
 
     print("Training time: %s s" % (time.time() - t1,))
@@ -292,8 +293,8 @@ def inference(args):
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.all.png" % na)
             pp_data.create_folder(os.path.dirname(out_path))
             fig, axs = plt.subplots(3, 1, sharex=False)
-            axs[0].matshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08), origin='lower', aspect='auto', cmap='jet')
-            axs[1].matshow(np.log(speech_x.T+1e-08), origin='lower', aspect='auto', cmap='jet')
+            axs[0].matshow(np.log(np.abs(mixed_cmplx_x.T) + 1e-08), origin='lower', aspect='auto', cmap='jet')
+            axs[1].matshow(np.log(speech_x.T + 1e-08), origin='lower', aspect='auto', cmap='jet')
             axs[2].matshow(pred_speech_lps.T, origin='lower', aspect='auto', cmap='jet')
             axs[0].set_title("%ddb mixture log spectrogram" % int(te_snr))
             axs[1].set_title("Clean speech log spectrogram")
@@ -305,11 +306,11 @@ def inference(args):
             plt.close('all')
             # plt.show()
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.mixture.png" % na)
-            display.specshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08))
+            display.specshow(np.log(np.abs(mixed_cmplx_x.T) + 1e-08))
             plt.title("%ddb mixture log spectrogram" % int(te_snr))
             plt.savefig(out_path)
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.clean.png" % na)
-            display.specshow(np.log(speech_x.T+1e-08))
+            display.specshow(np.log(speech_x.T + 1e-08))
             plt.title("Clean speech log spectrogram")
             plt.savefig(out_path)
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.enh.png" % na)
