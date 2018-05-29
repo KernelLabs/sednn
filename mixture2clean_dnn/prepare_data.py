@@ -583,6 +583,11 @@ def calculate_adaptive_utterance_features(args):
     names = os.listdir(adaptive_utterance_dir)
     names = set([name[:9] for name in names])
     all_features = dict()
+    max_len=0
+    for name in names:
+        path = os.path.join(adaptive_utterance_dir, name)
+        (audio1, _) = read_audio(path+'_SA1.WAV', cfg.sample_rate)
+        (audio2, _) = read_audio(path+'_SA2.WAV', cfg.sample_rate)
     for name in names:
         path = os.path.join(adaptive_utterance_dir, name)
         (audio1, _) = read_audio(path+'_SA1.WAV', cfg.sample_rate)
@@ -590,10 +595,15 @@ def calculate_adaptive_utterance_features(args):
         (audio2, _) = read_audio(path+'_SA2.WAV', cfg.sample_rate)
         audio_spec2 = calc_sp(audio2, mode='magnitude')
         all_features[name]=np.vstack([audio_spec1,audio_spec2])
+        max_len=max(max_len,len(all_features[name]))
 
     out_feat_path = os.path.join(workspace, "adaptive_utterance", data_type, "adaptive_utterance_spec.p")
     create_folder(os.path.dirname(out_feat_path))
     cPickle.dump(all_features, open(out_feat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
+
+    out_feat_path = os.path.join(workspace, "adaptive_utterance", data_type, "adaptive_utterance_max_len.p")
+    create_folder(os.path.dirname(out_feat_path))
+    cPickle.dump(max_len, open(out_feat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
 
 ###

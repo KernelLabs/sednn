@@ -26,9 +26,10 @@ from keras.models import *
 from keras.layers import *
 from keras.optimizers import Adam
 from keras.models import load_model
+import tensorflow as tf
 
 
-def eval(model, gen, x1, x2, y1, y2):
+def eval(model, gen, x1, x2, y1, y2, name, utts):
     """Validation function. 
     
     Args:
@@ -40,7 +41,7 @@ def eval(model, gen, x1, x2, y1, y2):
     pred_all, y_all = [], []
 
     # Inference in mini batch. 
-    for (batch_x, batch_y) in gen.generate(xs=[x1, x2], ys=[y1, y2]):
+    for (batch_x, batch_y) in gen.generate([x1, x2, name], [y1, y2], utts):
         pred = model.predict(batch_x)
         pred_all.append(np.hstack(pred))
         y_all.append(np.hstack(batch_y))
@@ -74,6 +75,15 @@ def train(args):
     t1 = time.time()
     tr_hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", "train", "%ddb" % int(tr_snr), "data.h5")
     te_hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", "test", "%ddb" % int(te_snr), "data.h5")
+    tr_adapt_utt_path = os.path.join(workspace, "adaptive_utterance",  "train", "adaptive_utterance_spec.p")
+    te_adapt_utt_path = os.path.join(workspace, "adaptive_utterance",  "test", "adaptive_utterance_spec.p")
+    tr_adapt_utt = cPickle.load(open(tr_adapt_utt_path, 'rb'))
+    te_adapt_utt = cPickle.load(open(te_adapt_utt_path, 'rb'))
+    tr_adapt_utt_len_path = os.path.join(workspace, "adaptive_utterance",  "train", "adaptive_utterance_max_len.p")
+    te_adapt_utt_len_path = os.path.join(workspace, "adaptive_utterance",  "test", "adaptive_utterance_max_len.p")
+    tr_adapt_utt_len = cPickle.load(open(tr_adapt_utt_len_path, 'rb'))
+    te_adapt_utt_len = cPickle.load(open(te_adapt_utt_len_path, 'rb'))
+    max_len=max(tr_adapt_utt_len,te_adapt_utt_len)
     (tr_x1, tr_x2, tr_y1, tr_y2, tr_name) = pp_data.load_hdf5(tr_hdf5_path)
     (te_x1, te_x2, te_y1, te_y2, te_name) = pp_data.load_hdf5(te_hdf5_path)
     print(tr_x1.shape, tr_y1.shape, tr_x2.shape, tr_y2.shape)
@@ -115,18 +125,25 @@ def train(args):
     out_dim2 = (257 + 40+30)
     out_dim2_irm = (257 + 40+64)
     num_fact = 30
+    def multiplication(pair_tensors):
+        x,y = pair_tensors
+        return K.sum(tf.multiply(y,K.expand_dims(x,-1)),axis=1)
 
-    adapt_input = Input(shape=(257,),name='adapt_input')
-    layer = Dense(512,activation='relu',name='adapt_dense1')(adapt_input)
+    adapt_input = Input(shape=(None,),name='adapt_input')
+    layer = Reshape((-1,257),name='reshape')(adapt_input)
+    layer = Dense(512,activation='relu',name='adapt_dense1')(layer)
     layer = Dense(512,activation='relu',name='adapt_dense2')(layer)
     layer = Dense(num_fact,activation='softmax',name='adapt_out')(layer)
-    alpha = Lambda(lambda x:K.sum(x,axis=0),output_shape=(num_fact,))(layer)
-    alpha2 = Lambda(lambda x:K.repeat_elements(x,n_hid,0),output_shape=(num_fact,))(alpha)
+    alpha = Lambda(lambda x:K.sum(x,axis=1),output_shape=(num_fact,),name='sequence_summing')(layer)
+    # alpha2 = Lambda(lambda x:K.repeat_elements(x,n_hid,0),output_shape=(num_fact*n_hid,),name='repeat')(alpha)
     input1 = Input(shape=(n_concat, input_dim1), name='input1')
     layer = Flatten(name='flatten')(input1)
-    layer = Dense(n_hid*num_fact, activation='relu', name='dense0')(layer)
+    layer = Dense(n_hid*num_fact, name='dense0')(layer)
+    layer = Reshape((num_fact,n_hid),name='reshape2')(layer)
+    layer = Lambda(multiplication,name='multiply')([alpha,layer])
+    # layer = Multiply()([alpha2,layer])
+    # layer = Reshape((num_fact,n_hid))(layer)
 
-    layer = merge([layer,alpha2],mode=lambda x:x[0]*x[1],output_shape=(n_hid*num_fact,))
     layer = Dense(n_hid, activation='relu', name='dense1')(layer)
     layer = Dropout(0.2)(layer)
     layer = Dense(n_hid, activation='relu', name='dense2')(layer)
@@ -150,9 +167,9 @@ def train(args):
     model.compile(loss='mean_absolute_error',
                   optimizer=Adam(lr=lr,epsilon=1e-03))
     # Data generator.
-    tr_gen = DataGenerator(batch_size=batch_size, type='train')
-    eval_te_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100)
-    eval_tr_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100)
+    tr_gen = DataGenerator(batch_size=batch_size, type='train',max_len=max_len)
+    eval_te_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100,max_len=max_len)
+    eval_tr_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100,max_len=max_len)
 
     # Directories for saving models and training stats
     model_dir = os.path.join(workspace, "models", "%ddb" % int(tr_snr))
@@ -163,8 +180,8 @@ def train(args):
 
     # Print loss before training. 
     iter = 0
-    tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2)
-    te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2)
+    tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2, tr_name, tr_adapt_utt)
+    te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2, te_name, te_adapt_utt)
     print("Iteration: %d, tr_loss: %f, te_loss: %f" % (iter, tr_loss, te_loss))
 
     # Save out training stats. 
@@ -176,14 +193,14 @@ def train(args):
 
     # Train. 
     t1 = time.time()
-    for (batch_x, batch_y) in tr_gen.generate(xs=[tr_x1, tr_x2, tr_name], ys=[tr_y1, tr_y2]):
+    for (batch_x, batch_y) in tr_gen.generate([tr_x1, tr_x2, tr_name], [tr_y1, tr_y2], tr_adapt_utt):
         loss = model.train_on_batch(batch_x, batch_y)
         iter += 1
 
         # Validate and save training stats. 
         if iter % 100 == 0:
-            tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2)
-            te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2)
+            tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2, tr_name, tr_adapt_utt)
+            te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2, te_name, te_adapt_utt)
             print("Iteration: %d, tr_loss: %f, te_loss: %f" % (iter, tr_loss, te_loss))
             sys.stdout.flush()
 
