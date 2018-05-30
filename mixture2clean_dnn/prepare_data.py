@@ -211,7 +211,7 @@ def calculate_mixture_features(args):
         write_audio(out_audio_path, mixed_audio2, fs)
 
         # Extract spectrogram. 
-        mixed_complx_x = calc_sp(mixed_audio, mode='complex')
+        mixed_complx_x = calc_sp(mixed_audio2, mode='complex')
         speech_x = calc_sp(speech_audio, mode='magnitude')
         noise_x = calc_sp(noise_audio+interfere_audio, mode='magnitude')
         total_frame += mixed_complx_x.shape[0]
