@@ -124,9 +124,14 @@ def train(args):
     out_dim1_irm = 257 + 40 + 64
     out_dim2 = (257 + 40 + 30)
     out_dim2_irm = (257 + 40 + 64)
-    num_fact = 30
+    num_factorize = 30
 
     def multiplication(pair_tensors):
+        '''
+        :param pair_tensors: x: (num_factorize,)
+                            y: (num_factorize, n_hid)
+        :return: (n_hid,) sum(x[i]*y[i,:],axis=1)
+        '''
         x, y = pair_tensors
         return K.sum(tf.multiply(y, K.expand_dims(x, -1)), axis=1)
 
@@ -134,17 +139,13 @@ def train(args):
     layer = Reshape((-1, 257), name='reshape')(adapt_input)
     layer = Dense(512, activation='relu', name='adapt_dense1')(layer)
     layer = Dense(512, activation='relu', name='adapt_dense2')(layer)
-    layer = Dense(num_fact, activation='softmax', name='adapt_out')(layer)
-    alpha = Lambda(lambda x: K.sum(x, axis=1), output_shape=(num_fact,), name='sequence_summing')(layer)
-    # alpha2 = Lambda(lambda x:K.repeat_elements(x,n_hid,0),output_shape=(num_fact*n_hid,),name='repeat')(alpha)
+    layer = Dense(num_factorize, activation='softmax', name='adapt_out')(layer)
+    alpha = Lambda(lambda x: K.sum(x, axis=1), output_shape=(num_factorize,), name='sequence_sum')(layer)
     input1 = Input(shape=(n_concat, input_dim1), name='input1')
     layer = Flatten(name='flatten')(input1)
-    layer = Dense(n_hid * num_fact, name='dense0')(layer)
-    layer = Reshape((num_fact, n_hid), name='reshape2')(layer)
+    layer = Dense(n_hid * num_factorize, name='dense0')(layer)
+    layer = Reshape((num_factorize, n_hid), name='reshape2')(layer)
     layer = Lambda(multiplication, name='multiply')([alpha, layer])
-    # layer = Multiply()([alpha2,layer])
-    # layer = Reshape((num_fact,n_hid))(layer)
-
     layer = Dense(n_hid, activation='relu', name='dense1')(layer)
     layer = Dropout(0.2)(layer)
     layer = Dense(n_hid, activation='relu', name='dense2')(layer)

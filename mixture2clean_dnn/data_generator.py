@@ -10,6 +10,13 @@ class DataGenerator(object):
         self.max_len = max_len
 
     def generate(self, xs, ys, utts):
+        """
+        batch data generator
+        :param xs: input data
+        :param ys: target(label) data
+        :param utts: list of speaker name
+        :return:
+        """
         x1 = xs[0]
         x2 = xs[1]
         adapt_utt = xs[2]
