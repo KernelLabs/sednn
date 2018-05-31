@@ -1,16 +1,12 @@
-# Speaker Adaptive Speech Enhancement Using DNN
+# Speaker dependent Speech Enhancement Using DNN
 This project is built on [sednn](https://github.com/yongxuUSTC/sednn/issues) by YONG XU & QIUQIANG KONG. For more information and how to use [click me](README_old.md)
 
-This project has two parts: a stronger speaker independent speeching enhancement model, and a auxiliary speaker encoding extraction network. They are connected by a speaker adaptation layer. The idea of this project comes from:
+This model is trained by massive data by single speaker, mixed with background noise and interfering speech.
 
 [1] Q. Wang, J. Du, L. R. Dai and C. H. Lee, "A Multiobjective Learning and Ensembling Approach to High-Performance Speech Enhancement With Compact Neural Network Architectures," in IEEE/ACM Transactions on Audio, Speech, and Language Processing, vol. 26, no. 7, pp. 1185-1197, July 2018.
 
-[2] K. Žmolíková, M. Delcroix, K. Kinoshita, T. Higuchi, A. Ogawa and T. Nakatani, "Learning speaker representation for neural network based multichannel speaker extraction," 2017 IEEE Automatic Speech Recognition and Understanding Workshop (ASRU), Okinawa, 2017, pp. 8-15.
-
-[3] Žmolíková, Kateřina & Delcroix, Marc & Kinoshita, Keisuke & Higuchi, Takuya & Ogawa, Atsunori & Nakatani, Tomohiro. (2017). Speaker-Aware Neural Network Based Beamformer for Speaker Extraction in Speech Mixtures. 2655-2659. 10.21437/Interspeech.2017-667. 
-
 ## Data
-The model is trained using [TIMIT](http://academictorrents.com/details/34e2b78745138186976cbc27939b1b34d18bd5b3) 4620 training sentences and 94 of 100 noise by [Hu](http://web.cse.ohio-state.edu/pnl/corpus/HuNonspeech/HuCorpus.html). With all concatenation of SA1 and SA2 used as speaker adaptive utterance. Each sentence in training set other than SA1, SA2 is randomly mixed with another speaker's utterance, and one randomly picked noise from training noise, repeating or truncating as necessary.
+The model is trained using [audio books](https://librivox.org) , each chapter of audio book is roughly [split](http://librosa.github.io/librosa/generated/librosa.effects.split.html#librosa.effects.split) into sentences, and 94 of 100 noise by [Hu](http://web.cse.ohio-state.edu/pnl/corpus/HuNonspeech/HuCorpus.html). Each sentence in training set is mixed with one sentence of another reader's book, and one randomly picked noise from training noise, repeating or truncating as necessary.
 
 ## Evaluation
 Original project uses [PESQ](https://www.itu.int/rec/T-REC-P.862-200102-I/en) score as evaluation metric. But it seems not working if there is interfering speech. I am looking for a subjective evaluation metric working for both background noise and interfering speech. Maybe python library [mir_eval]((https://www.itu.int/rec/T-REC-P.862-200102-I/en)) is a candidate.
@@ -18,7 +14,20 @@ Original project uses [PESQ](https://www.itu.int/rec/T-REC-P.862-200102-I/en) sc
 ## Requirement
 pip install -r requirement.txt
 
-## Next Step
-1. train the speaker adaptive model. Due to time limit, it has not been tested yet. Test i-vector vs speaker encoding network. Tune # of layers in aux layer, and # of factorization in adaptation layer.
-2. explore feed data/train pipeline. Now data are loaded to memory together, due to the limitation of memory size, we have to constrain the size of dataset. A feed data by small batch has implemented in interfere branch. But loading data and training seems to be done in sequence, and it is really slow.
-3. [Evaluation metric](#evaluation)
+## Pipeline
+1. create mixture csv: X utterance is mixed with Y noise and Z utterance of interfering from onset to offset .
+2. Extract mixture, clean, noise+interfere spectrogram to pickle.
+3. Calculate feature, target (spectrogram, MFCC, GFCC, IRM) from pickle in previous step. Then dump all feature to disk.
+4. load all feature from disk to memory, start training.
+5. Inference on test set.
+6. Evaluate performance on test set with PESQ tool.
+
+## Limitation
+Due to massive amount of data from one person, load all feature to memory is not practicable. Also collect massive data from one user is not practicable.
+### Data workaround
+Ideal of clustering and bracket.
+Train 10 models with 10 different speakers with massive data for each one. When a new user use this app, use something like nearest neighbor to find one speaker in training set that the user's voice most closed to. Then we can use this speaker's model to approximate this user, and enhance the speech.
+#### Limitation
+Impossible to find a few speakers that are representative, hard to find distance between speakers' voices in high dimension. We need to learn through data to find bases for these voice, which lead to speaker adaptation in SAT branch
+### Memory
+Instead of loading all samples to memory, load a small batch of samples each time. This idea is implemented in another branch, but running too slow. Next step would be build a pipeline for loading data from disk ,gradient descend and evaluation. 
