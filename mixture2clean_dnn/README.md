@@ -1,5 +1,5 @@
 # Speaker Adaptive Speech Enhancement Using DNN
-This project is built on [sednn](https://github.com/yongxuUSTC/sednn/issues) by YONG XU & QIUQIANG KONG. For more information and how to use[click me](README_old.md)
+This project is built on [sednn](https://github.com/yongxuUSTC/sednn/issues) by YONG XU & QIUQIANG KONG. For more information and how to use [click me](README_old.md)
 
 This project has two parts: a stronger speaker indenpendent speeching enhancement model, and a auxiliary speaker encoding extraction network. They are connected by a speaker adaptation layer. The idea of this project comes from:
 
@@ -14,3 +14,11 @@ The model is trained using [TIMIT](http://academictorrents.com/details/34e2b7874
 
 ## Evaluation
 Original project uses [PESQ](https://www.itu.int/rec/T-REC-P.862-200102-I/en) score as evaluation metric. But it seems not working if there is interfering speech. I am looking for a subjective evaluation metric working for both background noise and interfering speech. Maybe python library [mir_eval]((https://www.itu.int/rec/T-REC-P.862-200102-I/en)) is a candidate.
+
+## Requirement
+pip install -r requirement.txt
+
+## Next Step
+1. train the speaker adaptive model. Due to time limit, it has not been tested yet. Test i-vector vs speaker encoding network. Tune # of layers in aux layer, and # of factorization in adaptation layer.
+2. explore feed data/train pipeline. Now data are loaded to memory together, due to the limitation of memory size, we have to constrain the size of dataset. A feed data by small batch has implenemented in interfere branch. But loading data and training seems to be done in sequence, and it is really slow.
+3. [Evaluation metric](#evaluation)
