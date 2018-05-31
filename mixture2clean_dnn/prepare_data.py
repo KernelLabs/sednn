@@ -202,14 +202,14 @@ def calculate_mixture_features(args):
 
         # Get normalized mixture, speech, noise. 
         (mixed_audio, speech_audio, noise_audio, alpha) = additive_mixing(speech_audio, noise_audio)
-        (mixed_audio2, mixed_audio, interfere_audio, alpha) = additive_mixing(mixed_audio, interfere_audio)
+        (mixed_audio, _, interfere_audio, alpha) = additive_mixing(mixed_audio, interfere_audio)
 
         # Write out mixed audio. 
         out_bare_na = os.path.join("%s.%s" %
                                    (os.path.splitext(speech_na)[0], os.path.splitext(noise_na)[0]))
         out_audio_path = os.path.join(workspace, "mixed_audios", data_type, "%ddb" % int(snr), "%s.wav" % out_bare_na)
         create_folder(os.path.dirname(out_audio_path))
-        write_audio(out_audio_path, mixed_audio2, fs)
+        write_audio(out_audio_path, mixed_audio, fs)
 
         # Extract spectrogram. 
         mixed_complx_x = calc_sp(mixed_audio, mode='complex')
