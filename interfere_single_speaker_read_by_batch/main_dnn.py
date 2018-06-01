@@ -26,10 +26,9 @@ from keras.models import *
 from keras.layers import *
 from keras.optimizers import Adam
 from keras.models import load_model
-import tensorflow as tf
 
 
-def eval(model, gen, x1, x2, y1, y2, name, utts):
+def eval(model, gen, x1, x2, y1, y2):
     """Validation function. 
     
     Args:
@@ -41,7 +40,7 @@ def eval(model, gen, x1, x2, y1, y2, name, utts):
     pred_all, y_all = [], []
 
     # Inference in mini batch. 
-    for (batch_x, batch_y) in gen.generate([x1, x2, name], [y1, y2], utts):
+    for (batch_x, batch_y) in gen.generate(xs=[x1, x2], ys=[y1, y2]):
         pred = model.predict(batch_x)
         pred_all.append(np.hstack(pred))
         y_all.append(np.hstack(batch_y))
@@ -75,154 +74,139 @@ def train(args):
     t1 = time.time()
     tr_hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", "train", "%ddb" % int(tr_snr), "data.h5")
     te_hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", "test", "%ddb" % int(te_snr), "data.h5")
-    tr_adapt_utt_path = os.path.join(workspace, "adaptive_utterance", "train", "adaptive_utterance_spec.p")
-    te_adapt_utt_path = os.path.join(workspace, "adaptive_utterance", "test", "adaptive_utterance_spec.p")
-    tr_adapt_utt = cPickle.load(open(tr_adapt_utt_path, 'rb'))
-    te_adapt_utt = cPickle.load(open(te_adapt_utt_path, 'rb'))
-    tr_adapt_utt_len_path = os.path.join(workspace, "adaptive_utterance", "train", "adaptive_utterance_max_len.p")
-    te_adapt_utt_len_path = os.path.join(workspace, "adaptive_utterance", "test", "adaptive_utterance_max_len.p")
-    tr_adapt_utt_len = cPickle.load(open(tr_adapt_utt_len_path, 'rb'))
-    te_adapt_utt_len = cPickle.load(open(te_adapt_utt_len_path, 'rb'))
-    max_len = max(tr_adapt_utt_len, te_adapt_utt_len)
-    (tr_x1, tr_x2, tr_y1, tr_y2, tr_name) = pp_data.load_hdf5(tr_hdf5_path)
-    (te_x1, te_x2, te_y1, te_y2, te_name) = pp_data.load_hdf5(te_hdf5_path)
-    print(tr_x1.shape, tr_y1.shape, tr_x2.shape, tr_y2.shape)
-    print(te_x1.shape, te_y1.shape, te_x2.shape, te_y2.shape)
-    print("Load data time: %s s" % (time.time() - t1,))
+    (hf1, tr_x1, tr_x2, tr_y1, tr_y2) = pp_data.load_hdf5(tr_hdf5_path)
+    (hf2, te_x1, te_x2, te_y1, te_y2) = pp_data.load_hdf5(te_hdf5_path)
+    try:
+        print(tr_x1.shape, tr_y1.shape, tr_x2.shape, tr_y2.shape)
+        print(te_x1.shape, te_y1.shape, te_x2.shape, te_y2.shape)
+        print("Load data time: %s s" % (time.time() - t1,))
 
-    batch_size = 500
-    print("%d iterations / epoch" % int(tr_x1.shape[0] / batch_size))
+        batch_size = 500
+        print("%d iterations / epoch" % int(tr_x1.shape[0] / batch_size))
 
-    # Scale data. 
-    if not True:
+        # Scale data.
+        if not True:
+            t1 = time.time()
+            scaler_path = os.path.join(workspace, "packed_features", "spectrogram", "train", "%ddb" % int(tr_snr),
+                                       "scaler.p")
+            scaler = pickle.load(open(scaler_path, 'rb'))
+            tr_x1 = pp_data.scale_on_3d(tr_x1, scaler)
+            tr_y1 = pp_data.scale_on_2d(tr_y1, scaler)
+            te_x1 = pp_data.scale_on_3d(te_x1, scaler)
+            te_y1 = pp_data.scale_on_2d(te_y1, scaler)
+            tr_x2 = pp_data.scale_on_2d(tr_x2, scaler)
+            tr_y2 = pp_data.scale_on_2d(tr_y2, scaler)
+            te_x2 = pp_data.scale_on_2d(te_x2, scaler)
+            te_y2 = pp_data.scale_on_2d(te_y2, scaler)
+            print("Scale data time: %s s" % (time.time() - t1,))
+
+        # Debug plot.
+        if False:
+            plt.matshow(tr_x[0: 1000, 0, :].T, origin='lower', aspect='auto', cmap='jet')
+            plt.show()
+            pause
+
+        # Build model
+        (_, n_concat, n_freq) = tr_x1.shape
+        n_hid = 2048
+        input_dim1 = (257 + 40 +30) * 2
+        input_dim2 = (257 + 40+30)
+        out_dim1 = (257 + 40+30) * 2
+        out_dim1_irm = 257 + 40 +64
+        out_dim2 = (257 + 40+30)
+        out_dim2_irm = (257 + 40+64)
+
+        # model = Sequential()
+        # model.add(Flatten(input_shape=(n_concat, n_freq)))
+        # model.add(Dense(n_hid, activation='relu'))
+        # model.add(Dropout(0.2))
+        # model.add(Dense(n_hid, activation='relu'))
+        # model.add(Dropout(0.2))
+        # model.add(Dense(n_hid, activation='relu'))
+        # model.add(Dropout(0.2))
+        # model.add(Dense(n_freq, activation='linear'))
+        input1 = Input(shape=(n_concat, input_dim1), name='input1')
+        layer = Flatten(name='flatten')(input1)
+        layer = Dense(n_hid, activation='relu', name='dense1')(layer)
+        layer = Dropout(0.2)(layer)
+        layer = Dense(n_hid, activation='relu', name='dense2')(layer)
+        layer = Dropout(0.2)(layer)
+        partial_out1 = Dense(out_dim1, name='1_out_linear')(layer)
+        partial_out1_irm = Dense(out_dim1_irm, name='1_out_irm', activation='sigmoid')(layer)
+        out1 = concatenate([partial_out1, partial_out1_irm], name='out1')
+        input2 = Input(shape=(input_dim2,), name='input2')
+        layer = concatenate([input2, out1], name='merge')
+        layer = Dense(n_hid, activation='relu', name='dense3')(layer)
+        layer = Dropout(0.2)(layer)
+        layer = Dense(n_hid, activation='relu', name='dense4')(layer)
+        layer = Dropout(0.2)(layer)
+        partial_out2 = Dense(out_dim2, name='2_out_linear')(layer)
+        partial_out2_irm = Dense(out_dim2_irm, name='2_out_irm', activation='sigmoid')(layer)
+        out2 = concatenate([partial_out2, partial_out2_irm], name='out2')
+        model = Model(inputs=[input1, input2], outputs=[out1, out2])
+
+        model.summary()
+        sys.stdout.flush()
+        model.compile(loss='mean_absolute_error',
+                      optimizer=Adam(lr=lr,epsilon=1e-03))
+        # Data generator.
+        tr_gen = DataGenerator(batch_size=batch_size, type='train')
+        eval_te_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100)
+        eval_tr_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100)
+
+        # Directories for saving models and training stats
+        model_dir = os.path.join(workspace, "models", "%ddb" % int(tr_snr))
+        pp_data.create_folder(model_dir)
+
+        stats_dir = os.path.join(workspace, "training_stats", "%ddb" % int(tr_snr))
+        pp_data.create_folder(stats_dir)
+
+        # Print loss before training.
+        iter = 0
+        tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2)
+        te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2)
+        print("Iteration: %d, tr_loss: %f, te_loss: %f" % (iter, tr_loss, te_loss))
+
+        # Save out training stats.
+        stat_dict = {'iter': iter,
+                     'tr_loss': tr_loss,
+                     'te_loss': te_loss, }
+        stat_path = os.path.join(stats_dir, "%diters.p" % iter)
+        cPickle.dump(stat_dict, open(stat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
+
+        # Train.
         t1 = time.time()
-        scaler_path = os.path.join(workspace, "packed_features", "spectrogram", "train", "%ddb" % int(tr_snr),
-                                   "scaler.p")
-        scaler = pickle.load(open(scaler_path, 'rb'))
-        tr_x1 = pp_data.scale_on_3d(tr_x1, scaler)
-        tr_y1 = pp_data.scale_on_2d(tr_y1, scaler)
-        te_x1 = pp_data.scale_on_3d(te_x1, scaler)
-        te_y1 = pp_data.scale_on_2d(te_y1, scaler)
-        tr_x2 = pp_data.scale_on_2d(tr_x2, scaler)
-        tr_y2 = pp_data.scale_on_2d(tr_y2, scaler)
-        te_x2 = pp_data.scale_on_2d(te_x2, scaler)
-        te_y2 = pp_data.scale_on_2d(te_y2, scaler)
-        print("Scale data time: %s s" % (time.time() - t1,))
+        for (batch_x, batch_y) in tr_gen.generate(xs=[tr_x1, tr_x2], ys=[tr_y1, tr_y2]):
+            loss = model.train_on_batch(batch_x, batch_y)
+            iter += 1
 
-    # Debug plot. 
-    if False:
-        plt.matshow(tr_x[0: 1000, 0, :].T, origin='lower', aspect='auto', cmap='jet')
-        plt.show()
-        pause
+            # Validate and save training stats.
+            if iter % 100 == 0:
+                tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2)
+                te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2)
+                print("Iteration: %d, tr_loss: %f, te_loss: %f" % (iter, tr_loss, te_loss))
+                sys.stdout.flush()
 
-    # Build model
-    (_, n_concat, n_freq) = tr_x1.shape
-    n_hid = 2048
-    input_dim1 = (257 + 40 + 30) * 2
-    input_dim2 = (257 + 40 + 30)
-    out_dim1 = (257 + 40 + 30) * 2
-    out_dim1_irm = 257 + 40 + 64
-    out_dim2 = (257 + 40 + 30)
-    out_dim2_irm = (257 + 40 + 64)
-    num_factorize = 30
+                # Save out training stats.
+                stat_dict = {'iter': iter,
+                             'tr_loss': tr_loss,
+                             'te_loss': te_loss, }
+                stat_path = os.path.join(stats_dir, "%diters.p" % iter)
+                cPickle.dump(stat_dict, open(stat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
-    def multiplication(pair_tensors):
-        '''
-        :param pair_tensors: x: (num_factorize,)
-                            y: (num_factorize, n_hid)
-        :return: (n_hid,) sum(x[i]*y[i,:],axis=1)
-        '''
-        x, y = pair_tensors
-        return K.sum(tf.multiply(y, K.expand_dims(x, -1)), axis=1)
+            # Save model.
+            if iter % (iteration/20) == 0:
+                model_path = os.path.join(model_dir, "md_%diters.h5" % iter)
+                model.save(model_path)
+                print("Saved model to %s" % model_path)
 
-    adapt_input = Input(shape=(None,), name='adapt_input')
-    layer = Reshape((-1, 257), name='reshape')(adapt_input)
-    layer = Dense(512, activation='relu', name='adapt_dense1')(layer)
-    layer = Dense(512, activation='relu', name='adapt_dense2')(layer)
-    layer = Dense(num_factorize, activation='softmax', name='adapt_out')(layer)
-    alpha = Lambda(lambda x: K.sum(x, axis=1), output_shape=(num_factorize,), name='sequence_sum')(layer)
-    input1 = Input(shape=(n_concat, input_dim1), name='input1')
-    layer = Flatten(name='flatten')(input1)
-    layer = Dense(n_hid * num_factorize, name='dense0')(layer)
-    layer = Reshape((num_factorize, n_hid), name='reshape2')(layer)
-    layer = Lambda(multiplication, name='multiply')([alpha, layer])
-    layer = Dense(n_hid, activation='relu', name='dense1')(layer)
-    layer = Dropout(0.2)(layer)
-    layer = Dense(n_hid, activation='relu', name='dense2')(layer)
-    layer = Dropout(0.2)(layer)
-    partial_out1 = Dense(out_dim1, name='1_out_linear')(layer)
-    partial_out1_irm = Dense(out_dim1_irm, name='1_out_irm', activation='sigmoid')(layer)
-    out1 = concatenate([partial_out1, partial_out1_irm], name='out1')
-    input2 = Input(shape=(input_dim2,), name='input2')
-    layer = concatenate([input2, out1], name='merge')
-    layer = Dense(n_hid, activation='relu', name='dense3')(layer)
-    layer = Dropout(0.2)(layer)
-    layer = Dense(n_hid, activation='relu', name='dense4')(layer)
-    layer = Dropout(0.2)(layer)
-    partial_out2 = Dense(out_dim2, name='2_out_linear')(layer)
-    partial_out2_irm = Dense(out_dim2_irm, name='2_out_irm', activation='sigmoid')(layer)
-    out2 = concatenate([partial_out2, partial_out2_irm], name='out2')
-    model = Model(inputs=[input1, input2, adapt_input], outputs=[out1, out2])
+            if iter == iteration+1:
+                break
 
-    model.summary()
-    sys.stdout.flush()
-    model.compile(loss='mean_absolute_error',
-                  optimizer=Adam(lr=lr, epsilon=1e-03))
-    # Data generator.
-    tr_gen = DataGenerator(batch_size=batch_size, type='train', max_len=max_len)
-    eval_te_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100, max_len=max_len)
-    eval_tr_gen = DataGenerator(batch_size=batch_size, type='test', te_max_iter=100, max_len=max_len)
-
-    # Directories for saving models and training stats
-    model_dir = os.path.join(workspace, "models", "%ddb" % int(tr_snr))
-    pp_data.create_folder(model_dir)
-
-    stats_dir = os.path.join(workspace, "training_stats", "%ddb" % int(tr_snr))
-    pp_data.create_folder(stats_dir)
-
-    # Print loss before training. 
-    iter = 0
-    tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2, tr_name, tr_adapt_utt)
-    te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2, te_name, te_adapt_utt)
-    print("Iteration: %d, tr_loss: %f, te_loss: %f" % (iter, tr_loss, te_loss))
-
-    # Save out training stats. 
-    stat_dict = {'iter': iter,
-                 'tr_loss': tr_loss,
-                 'te_loss': te_loss, }
-    stat_path = os.path.join(stats_dir, "%diters.p" % iter)
-    cPickle.dump(stat_dict, open(stat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
-
-    # Train. 
-    t1 = time.time()
-    for (batch_x, batch_y) in tr_gen.generate([tr_x1, tr_x2, tr_name], [tr_y1, tr_y2], tr_adapt_utt):
-        loss = model.train_on_batch(batch_x, batch_y)
-        iter += 1
-
-        # Validate and save training stats. 
-        if iter % 100 == 0:
-            tr_loss = eval(model, eval_tr_gen, tr_x1, tr_x2, tr_y1, tr_y2, tr_name, tr_adapt_utt)
-            te_loss = eval(model, eval_te_gen, te_x1, te_x2, te_y1, te_y2, te_name, te_adapt_utt)
-            print("Iteration: %d, tr_loss: %f, te_loss: %f" % (iter, tr_loss, te_loss))
-            sys.stdout.flush()
-
-            # Save out training stats. 
-            stat_dict = {'iter': iter,
-                         'tr_loss': tr_loss,
-                         'te_loss': te_loss, }
-            stat_path = os.path.join(stats_dir, "%diters.p" % iter)
-            cPickle.dump(stat_dict, open(stat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
-
-        # Save model. 
-        if iter % (iteration / 20) == 0:
-            model_path = os.path.join(model_dir, "md_%diters.h5" % iter)
-            model.save(model_path)
-            print("Saved model to %s" % model_path)
-
-        if iter == iteration + 1:
-            break
-
-    print("Training time: %s s" % (time.time() - t1,))
+        print("Training time: %s s" % (time.time() - t1,))
+    finally:
+        hf1.close()
+        hf2.close()
 
 
 def inference(args):
@@ -294,8 +278,8 @@ def inference(args):
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.all.png" % na)
             pp_data.create_folder(os.path.dirname(out_path))
             fig, axs = plt.subplots(3, 1, sharex=False)
-            axs[0].matshow(np.log(np.abs(mixed_cmplx_x.T) + 1e-08), origin='lower', aspect='auto', cmap='jet')
-            axs[1].matshow(np.log(speech_x.T + 1e-08), origin='lower', aspect='auto', cmap='jet')
+            axs[0].matshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08), origin='lower', aspect='auto', cmap='jet')
+            axs[1].matshow(np.log(speech_x.T+1e-08), origin='lower', aspect='auto', cmap='jet')
             axs[2].matshow(pred_speech_lps.T, origin='lower', aspect='auto', cmap='jet')
             axs[0].set_title("%ddb mixture log spectrogram" % int(te_snr))
             axs[1].set_title("Clean speech log spectrogram")
@@ -307,11 +291,11 @@ def inference(args):
             plt.close('all')
             # plt.show()
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.mixture.png" % na)
-            display.specshow(np.log(np.abs(mixed_cmplx_x.T) + 1e-08))
+            display.specshow(np.log(np.abs(mixed_cmplx_x.T)+1e-08))
             plt.title("%ddb mixture log spectrogram" % int(te_snr))
             plt.savefig(out_path)
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.clean.png" % na)
-            display.specshow(np.log(speech_x.T + 1e-08))
+            display.specshow(np.log(speech_x.T+1e-08))
             plt.title("Clean speech log spectrogram")
             plt.savefig(out_path)
             out_path = os.path.join(workspace, "figures", "test", "%ddb" % int(te_snr), "%s.enh.png" % na)

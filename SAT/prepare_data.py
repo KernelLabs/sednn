@@ -372,9 +372,9 @@ def pack_features(args):
         if cnt % 100 == 0:
             print(cnt)
             sys.stdout.flush()
-            
-            # if cnt == 3: break
-            cnt += 1
+
+        # if cnt == 3: break
+        cnt += 1
 
     # x_all = np.concatenate(x_all, axis=0)  # (n_segs, n_concat, n_freq)
     # y_all = np.concatenate(y_all, axis=0)  # (n_segs, n_freq)
