@@ -30,7 +30,7 @@ def plot_training_stat(args):
     interval_iter = args.interval_iter
 
     tr_losses, te_losses, iters = [], [], []
-    
+
     # Load stats. 
     stats_dir = os.path.join(workspace, "training_stats", "%ddb" % int(tr_snr))
     for iter in xrange(bgn_iter, fin_iter, interval_iter):
@@ -39,7 +39,7 @@ def plot_training_stat(args):
         tr_losses.append(dict['tr_loss'])
         te_losses.append(dict['te_loss'])
         iters.append(dict['iter'])
-        
+
     # Plot
     line_tr, = plt.plot(tr_losses, c='b', label="Train")
     line_te, = plt.plot(te_losses, c='r', label="Test")
@@ -65,26 +65,26 @@ def calculate_pesq(args):
     workspace = args.workspace
     speech_dir = args.speech_dir
     te_snr = args.te_snr
-    
+
     # Remove already existed file. 
     os.system('rm _pesq_itu_results.txt')
     os.system('rm _pesq_results.txt')
-    
+
     # Calculate PESQ of all enhaced speech. 
     enh_speech_dir = os.path.join(workspace, "enh_wavs", "test", "%ddb" % int(te_snr))
     names = os.listdir(enh_speech_dir)
     for (cnt, na) in enumerate(names):
         print(cnt, na)
         enh_path = os.path.join(enh_speech_dir, na)
-        
+
         speech_na = na.split('.')[0]
         speech_path = os.path.join(speech_dir, "%s.WAV" % speech_na)
-        
+
         # Call executable PESQ tool. 
         cmd = ' '.join(["./pesq", speech_path, enh_path, "+16000"])
-        os.system(cmd)        
-        
-        
+        os.system(cmd)
+
+
 def get_stats(args):
     """Calculate stats of PESQ. 
     """
@@ -92,7 +92,7 @@ def get_stats(args):
     with open(pesq_path, 'rb') as f:
         reader = csv.reader(f, delimiter='\t')
         lis = list(reader)
-        
+
     pesq_dict = {}
     for i1 in xrange(1, len(lis) - 1):
         li = lis[i1]
@@ -103,7 +103,7 @@ def get_stats(args):
             pesq_dict[noise_type] = [pesq]
         else:
             pesq_dict[noise_type].append(pesq)
-        
+
     avg_list, std_list = [], []
     f = "{0:<16} {1:<16}"
     print(f.format("Noise", "PESQ"))
@@ -134,11 +134,11 @@ if __name__ == '__main__':
     parser_calculate_pesq.add_argument('--workspace', type=str, required=True)
     parser_calculate_pesq.add_argument('--speech_dir', type=str, required=True)
     parser_calculate_pesq.add_argument('--te_snr', type=float, required=True)
-    
+
     parser_get_stats = subparsers.add_parser('get_stats')
-    
+
     args = parser.parse_args()
-    
+
     if args.mode == 'plot_training_stat':
         plot_training_stat(args)
     elif args.mode == 'calculate_pesq':
