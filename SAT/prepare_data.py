@@ -175,14 +175,13 @@ def calculate_mixture_features(args):
         interfere_audio = load_fix_len_audio(speech_dir, interfere_na, len(speech_audio), fs, interfere_onset,
                                              interfere_offset)
 
-        # Scale speech to given snr. 
+        # Scale speech to given snr.
         scaler = get_amplitude_scaling_factor(speech_audio, noise_audio, snr=snr)
         speech_audio *= scaler
-        scaler = get_amplitude_scaling_factor(speech_audio, interfere_audio, snr=interfere_snr)
-        interfere_audio /= scaler
-
         # Get normalized mixture, speech, noise. 
         (mixed_audio, speech_audio, noise_audio, alpha) = additive_mixing(speech_audio, noise_audio)
+        scaler = get_amplitude_scaling_factor(mixed_audio, interfere_audio, snr=interfere_snr)
+        mixed_audio *= scaler
         (mixed_audio, _, interfere_audio, alpha) = additive_mixing(mixed_audio, interfere_audio)
 
         # Write out mixed audio. 
