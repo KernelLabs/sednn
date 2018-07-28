@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-MINIDATA=0
-if [ $MINIDATA -eq 1 ]; then
+MINIDATA=1
+if [ $MINIDATA -eq 0 ]; then
   WORKSPACE="workspace"
   mkdir -p $WORKSPACE
   TR_SPEECH_DIR="mini_data/train_speech_book"
@@ -46,7 +46,6 @@ N_NOISE_FRAME=6 # num of frame at the beginning of utterance to include as stati
 #python prepare_data.py pack_features --workspace=$WORKSPACE --data_type=test --snr=$TE_SNR --n_concat=$N_CONCAT --n_hop=$N_HOP --noise_frame=$N_NOISE_FRAME
 
 # Compute scaler. 
-# not used
 # python prepare_data.py compute_scaler --workspace=$WORKSPACE --data_type=train --snr=$TR_SNR
 
 # Train. 
