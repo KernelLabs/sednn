@@ -1,8 +1,8 @@
 """
-Summary:  Prepare data. 
+Summary:  Prepare data.
 Author:   Qiuqiang Kong
 Created:  2017.12.22
-Modified: - 
+Modified: -
 """
 import os
 import sys
@@ -44,18 +44,18 @@ def write_audio(path, audio, sample_rate):
 
 ###
 def create_mixture_csv(args):
-    """Create csv containing mixture information. 
+    """Create csv containing mixture information.
     Each line in the .csv file contains [speech_name, noise_name, noise_onset, noise_offset]
-    
+
     Args:
-      workspace: str, path of workspace. 
-      speech_dir: str, path of speech data. 
-      noise_dir: str, path of noise data. 
-      data_type: str, 'train' | 'test'. 
-      magnification: int, only used when data_type='train', number of noise 
+      workspace: str, path of workspace.
+      speech_dir: str, path of speech data.
+      noise_dir: str, path of noise data.
+      data_type: str, 'train' | 'test'.
+      magnification: int, only used when data_type='train', number of noise
           selected to mix with a speech. E.g., when magnication=3, then 4620
-          speech with create 4620*3 mixtures. magnification should not larger 
-          than the species of noises. 
+          speech with create 4620*3 mixtures. magnification should not larger
+          than the species of noises.
     """
     workspace = args.workspace
     speech_dir = args.speech_dir
@@ -77,12 +77,12 @@ def create_mixture_csv(args):
     f = open(out_csv_path, 'w')
     f.write("%s\t%s\t%s\t%s\t%s\t%s\n" % ("speech_name", "noise_name", "noise_onset", "noise_offset", "interfere_onset", "interfere_offset"))
     for speech_na in speech_names:
-        # Read speech. 
+        # Read speech.
         speech_path = os.path.join(speech_dir, speech_na)
         (speech_audio, _) = read_audio(speech_path, fs)
         len_speech = len(speech_audio)
 
-        # For training data, mix each speech with randomly picked #magnification noises. 
+        # For training data, mix each speech with randomly picked #magnification noises.
         if data_type == 'train':
             selected_noise_names = rs.choice(noise_names, size=magnification, replace=False)
         # For test data, mix each speech with all noises.
@@ -93,7 +93,7 @@ def create_mixture_csv(args):
 
         selected_interfere_names = rs.choice(interfere_names,size=1,replace=False)
 
-        # Mix one speech with different noises many times. 
+        # Mix one speech with different noises many times.
         for idx, noise_na in enumerate(selected_noise_names):
             noise_path = os.path.join(noise_dir, noise_na)
             (noise_audio, _) = read_audio(noise_path, fs)
@@ -131,15 +131,15 @@ def create_mixture_csv(args):
 
 ###
 def calculate_mixture_features(args):
-    """Calculate spectrogram for mixed, speech and noise audio. Then write the 
-    features to disk. 
-    
+    """Calculate spectrogram for mixed, speech and noise audio. Then write the
+    features to disk.
+
     Args:
-      workspace: str, path of workspace. 
-      speech_dir: str, path of speech data. 
-      noise_dir: str, path of noise data. 
-      data_type: str, 'train' | 'test'. 
-      snr: float, signal to noise ratio to be mixed. 
+      workspace: str, path of workspace.
+      speech_dir: str, path of speech data.
+      noise_dir: str, path of noise data.
+      data_type: str, 'train' | 'test'.
+      snr: float, signal to noise ratio to be mixed.
     """
     workspace = args.workspace
     speech_dir = args.speech_dir
@@ -150,7 +150,7 @@ def calculate_mixture_features(args):
     interfere_snr = args.interfere_snr
     fs = cfg.sample_rate
 
-    # Open mixture csv. 
+    # Open mixture csv.
     mixture_csv_path = os.path.join(workspace, "mixture_csvs", "%s.csv" % data_type)
     with open(mixture_csv_path, 'rb') as f:
         reader = csv.reader(f, delimiter='\t')
@@ -166,11 +166,11 @@ def calculate_mixture_features(args):
         interfere_onset = int(interfere_onset)
         interfere_offset = int(interfere_offset)
 
-        # Read speech audio. 
+        # Read speech audio.
         speech_path = os.path.join(speech_dir, speech_na)
         (speech_audio, _) = read_audio(speech_path, target_fs=fs)
 
-        # Read noise audio. 
+        # Read noise audio.
         noise_path = os.path.join(noise_dir, noise_na)
         (noise_audio, _) = read_audio(noise_path, target_fs=fs)
 
@@ -181,7 +181,7 @@ def calculate_mixture_features(args):
             n_repeat = int(np.ceil(float(len(speech_audio)) / float(len(noise_audio))))
             noise_audio_ex = np.tile(noise_audio, n_repeat)
             noise_audio = noise_audio_ex[0: len(speech_audio)]
-        # Truncate noise to the same length as speech. 
+        # Truncate noise to the same length as speech.
         else:
             noise_audio = noise_audio[noise_onset: noise_offset]
 
@@ -197,34 +197,34 @@ def calculate_mixture_features(args):
         scaler = get_amplitude_scaling_factor(speech_audio, noise_audio, snr=snr)
         speech_audio *= scaler
 
-        # Get normalized mixture, speech, noise. 
+        # Get normalized mixture, speech, noise.
         (mixed_audio, speech_audio, noise_audio, alpha) = additive_mixing(speech_audio, noise_audio)
 
         scaler = get_amplitude_scaling_factor(mixed_audio, interfere_audio, snr=interfere_snr)
         mixed_audio *= scaler
         (mixed_audio, _, interfere_audio, alpha) = additive_mixing(mixed_audio, interfere_audio)
 
-        # Write out mixed audio. 
+        # Write out mixed audio.
         out_bare_na = os.path.join("%s.%s" %
                                    (os.path.splitext(speech_na)[0], os.path.splitext(noise_na)[0]))
         out_audio_path = os.path.join(workspace, "mixed_audios", data_type, "%ddb" % int(snr), "%s.wav" % out_bare_na)
         create_folder(os.path.dirname(out_audio_path))
         write_audio(out_audio_path, mixed_audio, fs)
 
-        # Extract spectrogram. 
+        # Extract spectrogram.
         mixed_complx_x = calc_sp(mixed_audio, mode='complex')
         speech_x = calc_sp(speech_audio, mode='magnitude')
         noise_x = calc_sp(noise_audio+interfere_audio, mode='magnitude')
         total_frame += mixed_complx_x.shape[0]
 
-        # Write out features. 
+        # Write out features.
         out_feat_path = os.path.join(workspace, "features", "spectrogram",
                                      data_type, "%ddb" % int(snr), "%s.p" % out_bare_na)
         create_folder(os.path.dirname(out_feat_path))
         data = [mixed_complx_x, speech_x, noise_x, alpha, out_bare_na]
         cPickle.dump(data, open(out_feat_path, 'wb'), protocol=cPickle.HIGHEST_PROTOCOL)
 
-        # Print. 
+        # Print.
         if cnt % 100 == 0:
             print(cnt)
             sys.stdout.flush()
@@ -238,22 +238,22 @@ def calculate_mixture_features(args):
 
 
 def rms(y):
-    """Root mean square. 
+    """Root mean square.
     """
     return np.sqrt(np.mean(np.abs(y) ** 2, axis=0, keepdims=False))
 
 
 def get_amplitude_scaling_factor(s, n, snr, method='rms'):
-    """Given s and n, return the scaler s according to the snr. 
-    
+    """Given s and n, return the scaler s according to the snr.
+
     Args:
-      s: ndarray, source1. 
-      n: ndarray, source2. 
-      snr: float, SNR. 
-      method: 'rms'. 
-      
+      s: ndarray, source1.
+      n: ndarray, source2.
+      snr: float, SNR.
+      method: 'rms'.
+
     Outputs:
-      float, scaler. 
+      float, scaler.
     """
     original_sn_rms_ratio = rms(s) / rms(n)
     target_sn_rms_ratio = 10. ** (float(snr) / 20.)  # snr = 20 * lg(rms(s) / rms(n))
@@ -262,17 +262,17 @@ def get_amplitude_scaling_factor(s, n, snr, method='rms'):
 
 
 def additive_mixing(s, n):
-    """Mix normalized source1 and source2. 
-    
+    """Mix normalized source1 and source2.
+
     Args:
-      s: ndarray, source1. 
-      n: ndarray, source2. 
-      
+      s: ndarray, source1.
+      n: ndarray, source2.
+
     Returns:
-      mix_audio: ndarray, mixed audio. 
-      s: ndarray, pad or truncated and scalered source1. 
-      n: ndarray, scaled source2. 
-      alpha: float, normalize coefficient. 
+      mix_audio: ndarray, mixed audio.
+      s: ndarray, pad or truncated and scalered source1.
+      n: ndarray, scaled source2.
+      alpha: float, normalize coefficient.
     """
     mixed_audio = s + n
 
@@ -284,14 +284,14 @@ def additive_mixing(s, n):
 
 
 def calc_sp(audio, mode):
-    """Calculate spectrogram. 
-    
+    """Calculate spectrogram.
+
     Args:
-      audio: 1darray. 
+      audio: 1darray.
       mode: string, 'magnitude' | 'complex'
-    
+
     Returns:
-      spectrogram: 2darray, (n_time, n_freq). 
+      spectrogram: 2darray, (n_time, n_freq).
     """
     n_window = cfg.n_window
     n_overlap = cfg.n_overlap
@@ -316,14 +316,14 @@ def calc_sp(audio, mode):
 
 ###
 def pack_features(args):
-    """Load all features, apply log and conver to 3D tensor, write out to .h5 file. 
-    
+    """Load all features, apply log and conver to 3D tensor, write out to .h5 file.
+
     Args:
-      workspace: str, path of workspace. 
-      data_type: str, 'train' | 'test'. 
-      snr: float, signal to noise ratio to be mixed. 
-      n_concat: int, number of frames to be concatenated. 
-      n_hop: int, hop frames. 
+      workspace: str, path of workspace.
+      data_type: str, 'train' | 'test'.
+      snr: float, signal to noise ratio to be mixed.
+      n_concat: int, number of frames to be concatenated.
+      n_hop: int, hop frames.
     """
     workspace = args.workspace
     data_type = args.data_type
@@ -352,13 +352,13 @@ def pack_features(args):
     cnt = 0
     t1 = time.time()
 
-    # Load all features. 
+    # Load all features.
     feat_dir = os.path.join(workspace, "features", "spectrogram", data_type, "%ddb" % int(snr))
     names = os.listdir(feat_dir)
     mel_basis = librosa.filters.mel(cfg.sample_rate, cfg.n_window, n_mels=40)
     idx = 0
     for na in names:
-        # Load feature. 
+        # Load feature.
         feat_path = os.path.join(feat_dir, na)
         data = cPickle.load(open(feat_path, 'rb'))
         [mixed_complx_x, speech_x, noise_x, alpha, na] = data
@@ -387,7 +387,7 @@ def pack_features(args):
     # x_all = log_sp(x_all).astype(np.float32)
     # y_all = log_sp(y_all).astype(np.float32)
 
-    # Write out data to .h5 file. 
+    # Write out data to .h5 file.
     out_path = os.path.join(workspace, "packed_features", "spectrogram", data_type, "%ddb" % int(snr), "data.h5")
     create_folder(os.path.dirname(out_path))
     with h5py.File(out_path, 'w') as hf:
@@ -479,14 +479,14 @@ def log_sp(x):
 
 
 def mat_2d_to_3d(x, agg_num, hop):
-    """Segment 2D array to 3D segments. 
+    """Segment 2D array to 3D segments.
     """
-    # Pad to at least one block. 
+    # Pad to at least one block.
     len_x, n_in = x.shape
     if (len_x < agg_num):
         x = np.concatenate((x, np.zeros((agg_num - len_x, n_in))))
 
-    # Segment 2d to 3d. 
+    # Segment 2d to 3d.
     len_x = len(x)
     i1 = 0
     x3d = []
@@ -497,7 +497,7 @@ def mat_2d_to_3d(x, agg_num, hop):
 
 
 def pad_with_border(x, n_pad):
-    """Pad the begin and finish of spectrogram with border frame value. 
+    """Pad the begin and finish of spectrogram with border frame value.
     """
     x_pad_list = [x[0:1]] * n_pad + [x] + [x[-1:]] * n_pad
     return np.concatenate(x_pad_list, axis=0)
@@ -510,27 +510,27 @@ def pad_head_with_border(x, n_pad):
 
 ###
 def compute_scaler(args):
-    """Compute and write out scaler of data. 
+    """Compute and write out scaler of data.
     """
     workspace = args.workspace
     data_type = args.data_type
     snr = args.snr
 
-    # Load data. 
+    # Load data.
     t1 = time.time()
     hdf5_path = os.path.join(workspace, "packed_features", "spectrogram", data_type, "%ddb" % int(snr), "data.h5")
     with h5py.File(hdf5_path, 'r') as hf:
         x = hf.get('x1')
         x = np.array(x)  # (n_segs, n_concat, n_freq)
 
-    # Compute scaler. 
+    # Compute scaler.
     (n_segs, n_concat, n_freq) = x.shape
     x2d = x.reshape((n_segs * n_concat, n_freq))
     scaler = preprocessing.StandardScaler(with_mean=True, with_std=True).fit(x2d)
     print(scaler.mean_)
     print(scaler.scale_)
 
-    # Write out scaler. 
+    # Write out scaler.
     out_path = os.path.join(workspace, "packed_features", "spectrogram", data_type, "%ddb" % int(snr), "scaler.p")
     create_folder(os.path.dirname(out_path))
     pickle.dump(scaler, open(out_path, 'wb'))
@@ -540,13 +540,13 @@ def compute_scaler(args):
 
 
 def scale_on_2d(x2d, scaler):
-    """Scale 2D array data. 
+    """Scale 2D array data.
     """
     return scaler.transform(x2d)
 
 
 def scale_on_3d(x3d, scaler):
-    """Scale 3D array data. 
+    """Scale 3D array data.
     """
     (n_segs, n_concat, n_freq) = x3d.shape
     x2d = x3d.reshape((n_segs * n_concat, n_freq))
@@ -556,14 +556,14 @@ def scale_on_3d(x3d, scaler):
 
 
 def inverse_scale_on_2d(x2d, scaler):
-    """Inverse scale 2D array data. 
+    """Inverse scale 2D array data.
     """
     return x2d * scaler.scale_[None, :] + scaler.mean_[None, :]
 
 
 ###
 def load_hdf5(hdf5_path):
-    """Load hdf5 data. 
+    """Load hdf5 data.
     """
     with h5py.File(hdf5_path, 'r') as hf:
         x1 = hf.get('x1')

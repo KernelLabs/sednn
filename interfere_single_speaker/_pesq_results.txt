@@ -1,0 +1,4 @@
+DEGRADED	 PESQMOS	 SUBJMOS	 COND	 SAMPLE_FREQ	 CRUDE_DELAY
+adventuresofferdinandcountfathom_01_smollett_128kb27.n51.enh.wav	 0.074	 0.000	 0	 16000	0.4080
+ adventuresofferdinandcountfathom_01_smollett_128kb27.n21.enh.wav	 0.116	 0.000	 0	 16000	0.3880
+ 

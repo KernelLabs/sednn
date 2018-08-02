@@ -1,0 +1,4 @@
+REFERENCE	 DEGRADED	 PESQMOS	 PESQMOS	 SUBJMOS	 COND	 SAMPLE_FREQ	 CRUDE_DELAY
+mini_data/test_speech_book/adventuresofferdinandcountfathom_01_smollett_128kb27.wav	 workspace/enh_wavs/test/10db/adventuresofferdinandcountfathom_01_smollett_128kb27.n51.enh.wav	 SQValue=0.074	 0.074	 0.000	 0	 16000	0.4080
+ mini_data/test_speech_book/adventuresofferdinandcountfathom_01_smollett_128kb27.wav	 workspace/enh_wavs/test/10db/adventuresofferdinandcountfathom_01_smollett_128kb27.n21.enh.wav	 SQValue=0.116	 0.116	 0.000	 0	 16000	0.3880
+ 

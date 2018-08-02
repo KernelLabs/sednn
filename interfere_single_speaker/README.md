@@ -12,6 +12,9 @@ The model is trained using [audio books](https://librivox.org) , each chapter of
 Original project uses [PESQ](https://www.itu.int/rec/T-REC-P.862-200102-I/en) score as evaluation metric. But it seems not working if there is interfering speech. I am looking for a subjective evaluation metric working for both background noise and interfering speech. Maybe python library [mir_eval]((https://www.itu.int/rec/T-REC-P.862-200102-I/en)) is a candidate.
 
 ## Requirement
+sudo apt-get install python-tk
+virtualenv -p python env
+source ./env/bin/activate
 pip install -r requirement.txt
 
 ## Pipeline
